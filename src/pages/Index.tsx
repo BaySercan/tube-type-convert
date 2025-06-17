@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { toast } from "@/hooks/use-toast";
-import { Youtube, Download, FileText, Info, Music, Video } from 'lucide-react';
+import { Youtube, Download, FileText, Info, Music, Video, Zap, Sparkles } from 'lucide-react';
 
 const Index = () => {
   const [url, setUrl] = useState('');
@@ -14,7 +14,7 @@ const Index = () => {
   const outputOptions = [
     { id: 'mp3', label: 'MP3 Audio', icon: Music, description: 'Extract audio as MP3' },
     { id: 'mp4', label: 'MP4 Video', icon: Video, description: 'Download video as MP4' },
-    { id: 'transcript', label: 'Transcript', icon: FileText, description: 'Get video transcript' },
+    { id: 'transcript', label: 'AI Transcript', icon: FileText, description: 'Get AI-powered video transcript', isAI: true },
     { id: 'info', label: 'Video Info', icon: Info, description: 'Get video metadata' }
   ];
 
@@ -107,12 +107,17 @@ const Index = () => {
                   <button
                     key={option.id}
                     onClick={() => setSelectedOutput(option.id)}
-                    className={`p-4 rounded-lg border-2 transition-all duration-300 text-left group hover:scale-105 ${
+                    className={`p-4 rounded-lg border-2 transition-all duration-300 text-left group hover:scale-105 relative ${
                       selectedOutput === option.id
                         ? 'border-gray-400 bg-gray-700/40 shadow-lg shadow-gray-700/25'
                         : 'border-gray-600/40 bg-gray-800/20 hover:border-gray-500/60 hover:bg-gray-700/30'
                     }`}
                   >
+                    {option.isAI && (
+                      <div className="absolute -top-2 -right-2 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full p-1 animate-pulse">
+                        <Sparkles className="w-4 h-4 text-white" />
+                      </div>
+                    )}
                     <div className="flex items-start space-x-3">
                       <div className={`p-2 rounded-lg transition-colors ${
                         selectedOutput === option.id ? 'bg-gray-600' : 'bg-gray-700/60 group-hover:bg-gray-600/80'
@@ -120,7 +125,14 @@ const Index = () => {
                         <IconComponent className="w-5 h-5 text-gray-100" />
                       </div>
                       <div className="flex-1">
-                        <h3 className="text-gray-100 font-semibold">{option.label}</h3>
+                        <div className="flex items-center space-x-2">
+                          <h3 className="text-gray-100 font-semibold">{option.label}</h3>
+                          {option.isAI && (
+                            <span className="text-xs bg-gradient-to-r from-blue-500 to-purple-600 text-white px-2 py-1 rounded-full font-medium">
+                              AI
+                            </span>
+                          )}
+                        </div>
                         <p className="text-gray-400 text-sm mt-1">{option.description}</p>
                       </div>
                     </div>
@@ -131,14 +143,31 @@ const Index = () => {
           </div>
 
           {/* Process Button */}
-          <Button
-            onClick={handleProcess}
-            disabled={isProcessing}
-            className="w-full h-14 bg-gradient-to-r from-gray-700 to-gray-800 hover:from-gray-600 hover:to-gray-700 text-gray-100 font-semibold text-lg shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none border border-gray-600/30"
-          >
-            <Download className="w-6 h-6 mr-3" />
-            {isProcessing ? 'Processing...' : 'Start Conversion'}
-          </Button>
+          <div className="relative">
+            <Button
+              onClick={handleProcess}
+              disabled={isProcessing}
+              className="w-full h-16 bg-gradient-to-r from-blue-600 via-purple-600 to-blue-700 hover:from-blue-500 hover:via-purple-500 hover:to-blue-600 text-white font-bold text-xl shadow-2xl hover:shadow-blue-500/25 transition-all duration-500 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none border-0 relative overflow-hidden group"
+            >
+              {/* Animated background shimmer */}
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -skew-x-12 transform translate-x-[-100%] group-hover:translate-x-[200%] transition-transform duration-1000"></div>
+              
+              <div className="relative flex items-center justify-center space-x-3">
+                {isProcessing ? (
+                  <>
+                    <div className="w-6 h-6 border-2 border-white/40 border-t-white rounded-full animate-spin"></div>
+                    <span>Processing...</span>
+                  </>
+                ) : (
+                  <>
+                    <Zap className="w-7 h-7" />
+                    <span>Start Conversion</span>
+                    <Zap className="w-7 h-7" />
+                  </>
+                )}
+              </div>
+            </Button>
+          </div>
 
           {/* Status indicator */}
           {isProcessing && (
