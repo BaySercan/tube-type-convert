@@ -32,7 +32,7 @@ const Index = () => {
 
   const handleProcess = () => {
     if (!user) {
-      toast({
+      const { update: updateToast } = toast({
         title: "Authentication Required",
         description: "Please sign in to start a video conversion.",
         variant: "destructive",
@@ -40,6 +40,9 @@ const Index = () => {
           <ToastAction
             altText="Sign In"
             onClick={async () => {
+              updateToast({
+                description: "Redirecting to Google for sign-in...",
+              });
               const { error } = await supabase.auth.signInWithOAuth({
                 provider: 'google',
                 options: {
@@ -49,11 +52,11 @@ const Index = () => {
               });
               if (error) {
                 console.error("Error logging in with Google from toast:", error.message);
-                // Display a toast message for the error
-                toast({
+                updateToast({
                   title: "Sign-In Error",
                   description: error.message,
                   variant: "destructive",
+                  // action: <ToastAction altText="Retry" onClick={/* same handler */}>Retry</ToastAction> // Optional: add a retry
                 });
               }
             }}

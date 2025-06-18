@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"; // For user avatar
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"; // For dropdown
@@ -10,8 +10,10 @@ import { supabase } from '@/lib/supabaseClient';
 const Navbar = () => {
   const { user, signOut, isLoading } = useAuth();
   const navigate = useNavigate();
+  const [isSigningIn, setIsSigningIn] = useState(false);
 
   const handleSignIn = async () => {
+    setIsSigningIn(true);
     // console.log('handleSignIn called'); // Remove this line
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
@@ -21,6 +23,7 @@ const Navbar = () => {
       },
     });
     if (error) {
+      setIsSigningIn(false);
       console.error("Error logging in with Google from Navbar:", error.message);
       // Consider showing a toast message to the user here as well
       // toast({ title: "Sign-In Error", description: error.message, variant: "destructive" });
@@ -62,7 +65,10 @@ const Navbar = () => {
         </div>
 
         {/* Auth Section */}
-        <div className="flex items-center space-x-4" style={{ position: 'relative', zIndex: 50 }}>
+        <div
+          className="flex items-center space-x-4"
+          style={{ position: 'relative', zIndex: 50, pointerEvents: 'auto' }} // Added pointerEvents
+        >
           {isLoading ? (
             <div className="text-gray-300">Loading...</div>
           ) : user ? (
@@ -99,9 +105,20 @@ const Navbar = () => {
             <Button
               onClick={handleSignIn}
               className="bg-white text-gray-900 hover:bg-gray-100 font-medium"
+              disabled={isSigningIn}
+              style={{ pointerEvents: 'auto !important' }} // Added this line
             >
-              <LogIn className="w-4 h-4 mr-2" /> {/* Changed icon to LogIn */}
-              Sign In
+              {isSigningIn ? (
+                <>
+                  {/* Optional: add a small spinner icon here if available */}
+                  Signing In...
+                </>
+              ) : (
+                <>
+                  <LogIn className="w-4 h-4 mr-2" /> {/* Changed icon to LogIn */}
+                  Sign In
+                </>
+              )}
             </Button>
           )}
         </div>
