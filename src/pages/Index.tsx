@@ -4,12 +4,15 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { toast } from "@/hooks/use-toast";
+import { ToastAction } from "@/components/ui/toast";
 import { Youtube, Download, FileText, Info, Music, Video, Zap, Sparkles } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 
 const Index = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [url, setUrl] = useState('');
   const [selectedOutput, setSelectedOutput] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
@@ -31,7 +34,12 @@ const Index = () => {
       toast({
         title: "Authentication Required",
         description: "Please sign in to start a video conversion.",
-        variant: "destructive"
+        variant: "destructive",
+        action: (
+          <ToastAction altText="Sign In" onClick={() => navigate('/login')}>
+            Sign In
+          </ToastAction>
+        ),
       });
       return;
     }

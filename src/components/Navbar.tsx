@@ -11,6 +11,7 @@ const Navbar = () => {
   const navigate = useNavigate();
 
   const handleSignIn = () => {
+    console.log('handleSignIn called');
     navigate('/login'); // Navigate to the login page
   };
 
