@@ -5,14 +5,26 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 import { Youtube, User, FileText, DollarSign, LogOut, LogIn, UserCircle2 } from 'lucide-react'; // Added LogOut, LogIn, UserCircle2
 import { useAuth } from '@/contexts/AuthContext'; // Import useAuth
 import { Link, useNavigate } from 'react-router-dom'; // Import Link and useNavigate
+import { supabase } from '@/lib/supabaseClient';
 
 const Navbar = () => {
   const { user, signOut, isLoading } = useAuth();
   const navigate = useNavigate();
 
-  const handleSignIn = () => {
-    console.log('handleSignIn called');
-    navigate('/login'); // Navigate to the login page
+  const handleSignIn = async () => {
+    // console.log('handleSignIn called'); // Remove this line
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        // Optional: Specify redirectTo if needed, though Supabase default is usually fine
+        // redirectTo: `${window.location.origin}/auth/callback`
+      },
+    });
+    if (error) {
+      console.error("Error logging in with Google from Navbar:", error.message);
+      // Consider showing a toast message to the user here as well
+      // toast({ title: "Sign-In Error", description: error.message, variant: "destructive" });
+    }
   };
 
   const handleSignOut = async () => {
@@ -50,7 +62,7 @@ const Navbar = () => {
         </div>
 
         {/* Auth Section */}
-        <div className="flex items-center space-x-4">
+        <div className="flex items-center space-x-4" style={{ position: 'relative', zIndex: 50 }}>
           {isLoading ? (
             <div className="text-gray-300">Loading...</div>
           ) : user ? (

@@ -7,6 +7,7 @@ import { toast } from "@/hooks/use-toast";
 import { ToastAction } from "@/components/ui/toast";
 import { Youtube, Download, FileText, Info, Music, Video, Zap, Sparkles } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { supabase } from '@/lib/supabaseClient';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 
@@ -36,7 +37,27 @@ const Index = () => {
         description: "Please sign in to start a video conversion.",
         variant: "destructive",
         action: (
-          <ToastAction altText="Sign In" onClick={() => navigate('/login')}>
+          <ToastAction
+            altText="Sign In"
+            onClick={async () => {
+              const { error } = await supabase.auth.signInWithOAuth({
+                provider: 'google',
+                options: {
+                  // Optional: Specify redirectTo if needed
+                  // redirectTo: `${window.location.origin}/auth/callback`
+                },
+              });
+              if (error) {
+                console.error("Error logging in with Google from toast:", error.message);
+                // Display a toast message for the error
+                toast({
+                  title: "Sign-In Error",
+                  description: error.message,
+                  variant: "destructive",
+                });
+              }
+            }}
+          >
             Sign In
           </ToastAction>
         ),
