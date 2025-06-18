@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -8,6 +9,7 @@ import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 
 const Index = () => {
+  const { user } = useAuth();
   const [url, setUrl] = useState('');
   const [selectedOutput, setSelectedOutput] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
@@ -25,6 +27,15 @@ const Index = () => {
   };
 
   const handleProcess = () => {
+    if (!user) {
+      toast({
+        title: "Authentication Required",
+        description: "Please sign in to start a video conversion.",
+        variant: "destructive"
+      });
+      return;
+    }
+
     if (!url.trim()) {
       toast({
         title: "URL Required",
