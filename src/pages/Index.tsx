@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { toast } from "@/hooks/use-toast";
 import { ToastAction } from "@/components/ui/toast";
-import { Youtube, Download, FileText, Info, Music, Video, Zap, Sparkles } from 'lucide-react';
+import { Youtube, Download, FileText, Info, Music, Video, Zap, Sparkles, Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabaseClient';
 import Navbar from '../components/Navbar';
@@ -33,6 +33,7 @@ const Index = () => {
   const handleProcess = () => {
     if (!user) {
       const { update: updateToast } = toast({
+        id: 'auth-toast', // Ensure a consistent ID for updates
         title: "Authentication Required",
         description: "Please sign in to start a video conversion.",
         variant: "destructive",
@@ -41,7 +42,17 @@ const Index = () => {
             altText="Sign In"
             onClick={async () => {
               updateToast({
-                description: "Redirecting to Google for sign-in...",
+                id: 'auth-toast', // Ensure a consistent ID for updates
+                title: "Signing In...",
+                description: (
+                  <div style={{ display: 'flex', alignItems: 'center' }}>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Please wait while we redirect you...
+                  </div>
+                ),
+                action: null,
+                open: true,
+                variant: "default",
               });
               const { error } = await supabase.auth.signInWithOAuth({
                 provider: 'google',
@@ -53,10 +64,12 @@ const Index = () => {
               if (error) {
                 console.error("Error logging in with Google from toast:", error.message);
                 updateToast({
+                  id: 'auth-toast', // Ensure a consistent ID for updates
                   title: "Sign-In Error",
                   description: error.message,
+                  action: null, // No retry action for now
+                  open: true,
                   variant: "destructive",
-                  // action: <ToastAction altText="Retry" onClick={/* same handler */}>Retry</ToastAction> // Optional: add a retry
                 });
               }
             }}
