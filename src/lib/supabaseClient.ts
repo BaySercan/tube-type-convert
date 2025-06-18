@@ -20,6 +20,7 @@ if (!supabaseAnonKey) {
 // However, Supabase client itself might throw an error if URL is truly invalid.
 export const supabase = createClient(supabaseUrl || '', supabaseAnonKey || '');
 
-// Add a check to ensure .env is in .gitignore
-// If .gitignore does not exist, create it.
-// If .env is not in .gitignore, add it.
+// Ensure that your .env file (which contains sensitive keys) is listed in your .gitignore file
+// to prevent committing it to your repository.
+// Example .gitignore line:
+// .env
