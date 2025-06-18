@@ -39,15 +39,15 @@ const Index = () => {
         variant: "destructive",
         action: (
           <ToastAction
-            altText="Sign In"
+            altText="Sign in with Google"
             onClick={async () => {
               updateToast({
                 id: 'auth-toast', // Ensure a consistent ID for updates
-                title: "Signing In...",
+                title: "Signing in with Google...", // Changed
                 description: (
                   <div style={{ display: 'flex', alignItems: 'center' }}>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Please wait while we redirect you...
+                    Please wait...
                   </div>
                 ),
                 action: null,
@@ -74,7 +74,7 @@ const Index = () => {
               }
             }}
           >
-            Sign In
+            Sign in with Google
           </ToastAction>
         ),
       });

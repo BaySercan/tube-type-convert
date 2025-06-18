@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"; // For user avatar
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"; // For dropdown
-import { Youtube, User, FileText, DollarSign, LogOut, LogIn, UserCircle2 } from 'lucide-react'; // Added LogOut, LogIn, UserCircle2
+import { Youtube, User, FileText, DollarSign, LogOut, LogIn, UserCircle2, Chrome, Loader2 } from 'lucide-react'; // Added Chrome, Loader2
 import { useAuth } from '@/contexts/AuthContext'; // Import useAuth
 import { Link, useNavigate } from 'react-router-dom'; // Import Link and useNavigate
 import { supabase } from '@/lib/supabaseClient';
@@ -110,13 +110,13 @@ const Navbar = () => {
             >
               {isSigningIn ? (
                 <>
-                  {/* Optional: add a small spinner icon here if available */}
-                  Signing In...
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Signing in with Google...
                 </>
               ) : (
                 <>
-                  <LogIn className="w-4 h-4 mr-2" /> {/* Changed icon to LogIn */}
-                  Sign In
+                  <Chrome className="w-4 h-4 mr-2" />
+                  Sign in with Google
                 </>
               )}
             </Button>
