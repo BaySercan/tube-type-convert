@@ -54,8 +54,12 @@ const DashboardPage = () => {
     try {
       const data = await videoApi.getVideoInfo(videoUrl);
       updateSidebarWithData("Video Information", data);
-    } catch (err: any) {
-      updateSidebarWithError("Error Fetching Info", err.message || "An unknown error occurred.");
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        updateSidebarWithError("Error Fetching Info", err.message);
+      } else {
+        updateSidebarWithError("Error Fetching Info", "An unknown error occurred.");
+      }
     }
   };
 
@@ -88,8 +92,12 @@ const DashboardPage = () => {
         message: `${format.toUpperCase()} download should begin shortly. Check your browser downloads.`,
         fileName,
       });
-    } catch (err: any) {
-      updateSidebarWithError(`Error Downloading ${format.toUpperCase()}`, err.message || "An unknown error occurred.");
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        updateSidebarWithError(`Error Downloading ${format.toUpperCase()}`, err.message);
+      } else {
+        updateSidebarWithError(`Error Downloading ${format.toUpperCase()}`, "An unknown error occurred.");
+      }
     }
   };
 
@@ -107,8 +115,12 @@ const DashboardPage = () => {
       updateSidebarWithData("Video Transcript", data);
       // TODO: Implement polling if 'data' indicates a job ID
       // e.g., if (data.jobId) { pollProgress(data.jobId); }
-    } catch (err: any) {
-      updateSidebarWithError("Error Fetching Transcript", err.message || "An unknown error occurred.");
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        updateSidebarWithError("Error Fetching Transcript", err.message);
+      } else {
+        updateSidebarWithError("Error Fetching Transcript", "An unknown error occurred.");
+      }
     }
   };
 
