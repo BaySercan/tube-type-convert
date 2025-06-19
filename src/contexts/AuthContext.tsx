@@ -63,41 +63,46 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   useEffect(() => {
-    setIsLoading(true); // For session loading
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      setSession(session);
-      const currentUser = session?.user ?? null;
-      setUser(currentUser);
-      if (currentUser) {
-        await fetchUserProfile(currentUser.id);
+    // Initial session check
+    setIsLoading(true);
+    supabase.auth.getSession().then(async ({ data: { session: initialSession } }) => {
+      setSession(initialSession);
+      const initialUser = initialSession?.user ?? null;
+      setUser(initialUser);
+      if (initialUser) {
+        // Don't await here to avoid blocking initial load's setIsLoading(false)
+        fetchUserProfile(initialUser.id);
       } else {
-        setUserProfile(null); // Clear profile if no user
+        setUserProfile(null);
       }
-      setIsLoading(false);
+      setIsLoading(false); // Initial loading is done
+    }).catch(() => {
+      setIsLoading(false); // Ensure loading is false even on error
     });
 
+    // Listen for auth state changes
     const { data: authListener } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
-        // Note: Setting isLoading to true here might cause a flash if session is quickly resolved.
-        // Consider if only session loading should gate the main isLoading, and profile has its own.
-        // For now, following the plan:
-        setIsLoading(true);
-        setSession(session);
-        const currentUser = session?.user ?? null;
+      async (_event, newSession) => {
+        setSession(newSession);
+        const currentUser = newSession?.user ?? null;
         setUser(currentUser);
+
         if (currentUser) {
+          // When auth state changes (login/logout), fetch profile.
+          // isLoadingProfile will cover this.
           await fetchUserProfile(currentUser.id);
         } else {
-          setUserProfile(null); // Clear profile if no user
+          setUserProfile(null); // Clear profile if no user (logout)
         }
-        setIsLoading(false);
+        // `isLoading` is not set to true here, as this is an update, not initial load.
+        // The Navbar will react to `user` changing.
       }
     );
 
     return () => {
       authListener?.unsubscribe();
     };
-  }, []); // fetchUserProfile is stable and doesn't need to be in dependency array
+  }, []); // fetchUserProfile is stable, no need to add to deps
 
   const wrappedSignOut = async () => {
     await supabase.auth.signOut();

@@ -35,21 +35,30 @@ export const authenticatedFetch = async (
     // Example: throw new Error("User not authenticated");
   }
 
-  const response = await fetch(url, {
-    ...options,
-    headers,
-  });
+  console.log('[authenticatedFetch] Requesting URL:', url);
+  console.log('[authenticatedFetch] With options:', { ...options, headers: Object.fromEntries(headers.entries()) });
 
-  // Optional: Basic error handling for 401 Unauthorized
-  // More sophisticated error handling (like redirecting to login or trying to refresh token explicitly)
-  // can be added here or in the calling code (e.g., react-query's onError).
-  if (response.status === 401) {
-    console.error('API request returned 401 Unauthorized. The token might be invalid or expired.');
-    // Potentially trigger a sign out or redirect here if appropriate for your app's UX.
-    // For example: await supabase.auth.signOut(); window.location.href = '/login';
+  try {
+    const response = await fetch(url, {
+      ...options,
+      headers,
+      mode: 'cors', // Explicitly set mode, though usually default for cross-origin
+    });
+
+    // Optional: Basic error handling for 401 Unauthorized
+    // More sophisticated error handling (like redirecting to login or trying to refresh token explicitly)
+    // can be added here or in the calling code (e.g., react-query's onError).
+    if (response.status === 401) {
+      console.error('[authenticatedFetch] API request returned 401 Unauthorized. The token might be invalid or expired.');
+      // Potentially trigger a sign out or redirect here if appropriate for your app's UX.
+    }
+    return response;
+  } catch (error) {
+    console.error('[authenticatedFetch] Fetch call failed:', error);
+    // Re-throw the error so it can be caught by the calling function (in videoApi.ts, then DashboardPage.tsx)
+    // This ensures that the UI can update to show an error state.
+    throw error;
   }
-
-  return response;
 };
 
 // Example of how to use it with @tanstack/react-query (for demonstration)
