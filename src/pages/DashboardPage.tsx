@@ -223,7 +223,7 @@ const DashboardPage = () => {
         isLoading={isSidebarLoading}
         error={sidebarError} // Use the dedicated sidebarError state
       />
-      {console.log('[DashboardPage] Rendering ProcessSidebar. isSidebarOpen:', isSidebarOpen, 'isSidebarLoading:', isSidebarLoading, 'Error:', sidebarError, 'Data:', sidebarData)}
+      {/* Removed console.log from here to fix ReactNode error */}
     </div>
   );
 };

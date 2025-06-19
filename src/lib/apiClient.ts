@@ -1,8 +1,8 @@
 import { supabase } from './supabaseClient';
 
-interface FetchOptions extends RequestInit {
-  // We can add custom options if needed in the future
-}
+// interface FetchOptions extends RequestInit { // Removed as it's currently empty
+//   // We can add custom options if needed in the future
+// }
 
 /**
  * A utility function to make authenticated fetch requests.
@@ -21,7 +21,7 @@ import { getCustomApiToken } from './apiTokenStore'; // Import the getter for ou
 
 export const authenticatedFetch = async (
   url: string,
-  options: FetchOptions = {}
+  options: RequestInit = {} // Changed FetchOptions to RequestInit
 ): Promise<Response> => {
   const customToken = getCustomApiToken(); // Get our custom API token
 

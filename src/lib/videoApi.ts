@@ -4,7 +4,7 @@ const API_BASE_URL = 'http://localhost:3500'; // Or your production URL
 
 // Types based on openapi.yaml - consider generating these for more complex APIs
 
-interface VideoInfo {
+export interface VideoInfo { // Added export
   title: string;
   thumbnail: string;
   video_id: string;
@@ -13,7 +13,7 @@ interface VideoInfo {
   post_date: string;
 }
 
-interface TranscriptResponse {
+export interface TranscriptResponse { // Added export
   success: boolean;
   title: string;
   language: string;

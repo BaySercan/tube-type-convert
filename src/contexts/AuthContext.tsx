@@ -179,7 +179,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     return () => {
       console.log('[AuthContext] useEffect Cleanup. Unsubscribing auth listener.');
-      authListener?.unsubscribe();
+      // Supabase v2 onAuthStateChange returns { data: { subscription } }
+      // So, we need to call unsubscribe on the subscription object.
+      if (authListener && authListener.data && authListener.data.subscription) {
+        authListener.data.subscription.unsubscribe();
+        console.log('[AuthContext] Successfully unsubscribed from auth state changes.');
+      } else {
+        console.warn('[AuthContext] Could not unsubscribe from auth state changes, structure unexpected or listener null.');
+      }
     };
   }, []); // fetchUserProfile is stable, no need to add to deps
 
