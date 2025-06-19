@@ -58,8 +58,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         throw new Error(data.error || `Token exchange failed with status ${response.status}`);
       }
 
-import { setCustomApiToken as storeToken, getCustomApiToken as retrieveToken } from '@/lib/apiTokenStore'; // Import store functions
-
 // ... (inside AuthProvider)
 // ...
       if (data.apiToken) {
