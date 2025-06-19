@@ -1,21 +1,22 @@
 import { useAuth } from '@/contexts/AuthContext';
-import { useState } from "react";
+import { useState, useEffect } from "react"; // Added useEffect
 import { Button } from "@/components/ui/button";
 import { ProcessSidebar } from "@/components/ProcessSidebar";
 import { supabase } from "@/lib/supabaseClient";
 import { useNavigate } from "react-router-dom";
-import * as videoApi from '@/lib/videoApi'; // Import API functions
+import * as videoApi from '@/lib/videoApi';
+import { useMutation, useQueryClient } from '@tanstack/react-query'; // Import useMutation
 
 const DashboardPage = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  // const queryClient = useQueryClient(); // If needed for cache invalidation
 
   const [videoUrl, setVideoUrl] = useState("");
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [sidebarData, setSidebarData] = useState<object | null>(null);
+  const [sidebarData, setSidebarData] = useState<object | null>(null); // Retain for sidebar direct data
   const [sidebarTitle, setSidebarTitle] = useState("Process Details");
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // isLoading and error will now primarily come from useMutation states
 
   const handleLogout = async () => {
     const { error } = await supabase.auth.signOut();
@@ -23,106 +24,134 @@ const DashboardPage = () => {
     else navigate("/login");
   };
 
-  const openSidebar = (title: string) => {
+  // Unified sidebar opening logic, independent of API call state management
+  const openSidebarForAction = (title: string) => {
+    console.log('[DashboardPage] openSidebarForAction called. Title:', title);
     setSidebarTitle(title);
-    setIsLoading(true);
-    setError(null);
-    setSidebarData(null);
+    setSidebarData(null); // Clear previous data
+    setErrorForSidebar(null); // Clear previous error
     setIsSidebarOpen(true);
+    console.log('[DashboardPage] setIsSidebarOpen(true) - state should be updated.');
   };
 
-  const updateSidebarWithData = (title: string, data: object) => {
-    setSidebarTitle(title);
-    setSidebarData(data);
-    setIsLoading(false);
-    setError(null);
-  };
+  // Specific state for sidebar error, to distinguish from mutation.error
+  const [sidebarError, setErrorForSidebar] = useState<string | null>(null);
 
-  const updateSidebarWithError = (title: string, errorMessage: string) => {
-    setSidebarTitle(title);
-    setError(errorMessage);
-    setIsLoading(false);
-    setSidebarData(null);
-  };
 
-  const handleGetInfo = async () => {
+  // --- React Query Mutations ---
+
+  const infoMutation = useMutation<videoApi.VideoInfo, Error, string>({
+    mutationFn: (url: string) => videoApi.getVideoInfo(url),
+    onSuccess: (data) => {
+      console.log('[DashboardPage] Info Mutation onSuccess:', data);
+      setSidebarTitle("Video Information");
+      setSidebarData(data);
+      setErrorForSidebar(null);
+    },
+    onError: (error) => {
+      console.error('[DashboardPage] Info Mutation onError:', error);
+      setSidebarTitle("Error Fetching Info");
+      setErrorForSidebar(error.message || "An unknown error occurred.");
+      setSidebarData(null);
+    },
+  });
+
+  const handleGetInfo = () => {
     if (!videoUrl) {
       alert("Please enter a video URL.");
       return;
     }
-    openSidebar("Fetching Video Info...");
-    try {
-      const data = await videoApi.getVideoInfo(videoUrl);
-      updateSidebarWithData("Video Information", data);
-    } catch (err: unknown) {
-      if (err instanceof Error) {
-        updateSidebarWithError("Error Fetching Info", err.message);
-      } else {
-        updateSidebarWithError("Error Fetching Info", "An unknown error occurred.");
-      }
-    }
+    openSidebarForAction("Fetching Video Info...");
+    infoMutation.mutate(videoUrl);
   };
 
-  const handleDownload = async (format: 'mp3' | 'mp4') => {
-    if (!videoUrl) {
-      alert("Please enter a video URL.");
-      return;
-    }
-    // Sidebar can show a "Preparing download..." message
-    openSidebar(`Preparing ${format.toUpperCase()} Download...`);
-    try {
-      const blob = format === 'mp3'
-        ? await videoApi.downloadMp3(videoUrl)
-        : await videoApi.downloadMp4(videoUrl);
+  // isLoading for the form/buttons will be a composite of all mutation loading states
+  const isActionLoading = infoMutation.isPending; // Will add other mutations later
 
+  // This useEffect is to manage the global isLoading state for the sidebar display if needed
+  // but ProcessSidebar now takes its own isLoading prop directly from mutation.isPending
+  // We also need a way to show loading *in the sidebar* when a mutation is pending.
+  // The `ProcessSidebar`'s `isLoading` prop will now be driven by individual mutation `isPending` states.
+
+  type DownloadArgs = { url: string; format: 'mp3' | 'mp4' };
+
+  const downloadFileMutation = useMutation<Blob, Error, DownloadArgs>({
+    mutationFn: (args: DownloadArgs) =>
+      args.format === 'mp3'
+        ? videoApi.downloadMp3(args.url)
+        : videoApi.downloadMp4(args.url),
+    onSuccess: (blob, variables) => {
+      console.log(`[DashboardPage] Download ${variables.format.toUpperCase()} Mutation onSuccess`);
       const link = document.createElement('a');
       link.href = URL.createObjectURL(blob);
-      // Try to get filename from API response headers if available, or generate one
-      // For simplicity, using a generic name here.
-      // A more robust solution would involve parsing Content-Disposition header.
-      const videoIdMatch = videoUrl.match(/[?&]v=([^&]+)/);
-      const fileName = videoIdMatch ? `${videoIdMatch[1]}.${format}` : `video.${format}`;
+      const videoIdMatch = variables.url.match(/[?&]v=([^&]+)/);
+      const fileName = videoIdMatch
+        ? `${videoIdMatch[1]}.${variables.format}`
+        : `video.${variables.format}`;
       link.download = fileName;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      URL.revokeObjectURL(link.href); // Clean up
+      URL.revokeObjectURL(link.href);
 
-      updateSidebarWithData(`${format.toUpperCase()} Download Started`, {
-        message: `${format.toUpperCase()} download should begin shortly. Check your browser downloads.`,
+      setSidebarTitle(`${variables.format.toUpperCase()} Download Started`);
+      setSidebarData({
+        message: `${variables.format.toUpperCase()} download should begin shortly. Check your browser downloads.`,
         fileName,
       });
-    } catch (err: unknown) {
-      if (err instanceof Error) {
-        updateSidebarWithError(`Error Downloading ${format.toUpperCase()}`, err.message);
-      } else {
-        updateSidebarWithError(`Error Downloading ${format.toUpperCase()}`, "An unknown error occurred.");
-      }
-    }
-  };
+      setErrorForSidebar(null);
+    },
+    onError: (error, variables) => {
+      console.error(`[DashboardPage] Download ${variables.format.toUpperCase()} Mutation onError:`, error);
+      setSidebarTitle(`Error Downloading ${variables.format.toUpperCase()}`);
+      setErrorForSidebar(error.message || "An unknown error occurred.");
+      setSidebarData(null);
+    },
+  });
 
-  const handleGetTranscript = async () => {
+  const handleDownload = (format: 'mp3' | 'mp4') => {
     if (!videoUrl) {
       alert("Please enter a video URL.");
       return;
     }
-    openSidebar("Fetching Transcript...");
-    try {
-      // Assuming /transcript might return a job ID or direct data
-      // For now, let's assume it returns data directly or an error
-      // Polling logic for /progress and /result would be added here if API always returns job ID first
-      const data = await videoApi.getVideoTranscript(videoUrl);
-      updateSidebarWithData("Video Transcript", data);
-      // TODO: Implement polling if 'data' indicates a job ID
-      // e.g., if (data.jobId) { pollProgress(data.jobId); }
-    } catch (err: unknown) {
-      if (err instanceof Error) {
-        updateSidebarWithError("Error Fetching Transcript", err.message);
-      } else {
-        updateSidebarWithError("Error Fetching Transcript", "An unknown error occurred.");
-      }
-    }
+    openSidebarForAction(`Preparing ${format.toUpperCase()} Download...`);
+    downloadFileMutation.mutate({ url: videoUrl, format });
   };
+
+  const transcriptMutation = useMutation<videoApi.TranscriptResponse, Error, string>({
+    mutationFn: (url: string) => videoApi.getVideoTranscript(url), // Default lang, skipAI, useDeepSeek
+    onSuccess: (data) => {
+      console.log('[DashboardPage] Transcript Mutation onSuccess:', data);
+      setSidebarTitle("Video Transcript");
+      setSidebarData(data);
+      setErrorForSidebar(null);
+      // TODO: Check if data indicates a job ID for polling, if so, initiate polling.
+      // if (data.jobId && !data.transcript) { startPolling(data.jobId); }
+    },
+    onError: (error) => {
+      console.error('[DashboardPage] Transcript Mutation onError:', error);
+      setSidebarTitle("Error Fetching Transcript");
+      setErrorForSidebar(error.message || "An unknown error occurred.");
+      setSidebarData(null);
+    },
+  });
+
+  const handleGetTranscript = () => {
+    if (!videoUrl) {
+      alert("Please enter a video URL.");
+      return;
+    }
+    openSidebarForAction("Fetching Transcript...");
+    transcriptMutation.mutate(videoUrl);
+  };
+
+  // Composite loading state for disabling form elements
+  const isFormDisabled = infoMutation.isPending || downloadFileMutation.isPending || transcriptMutation.isPending;
+
+  // Determine sidebar loading state based on which mutation is active (if any)
+  // This is a simplification; a more complex UI might show different loading for different actions.
+  const isSidebarLoading = infoMutation.isPending || downloadFileMutation.isPending || transcriptMutation.isPending;
+
 
   // Basic polling function example (if needed)
   // const pollProgress = async (jobId: string) => {
@@ -173,14 +202,14 @@ const DashboardPage = () => {
                 onChange={(e) => setVideoUrl(e.target.value)}
                 className="block w-full shadow-sm sm:text-sm border-gray-300 rounded-md p-2 border"
                 placeholder="e.g., https://www.youtube.com/watch?v=dQw4w9WgXcQ"
-                disabled={isLoading}
+                disabled={isFormDisabled}
               />
             </div>
             <div className="flex space-x-2">
-              <Button onClick={handleGetInfo} disabled={isLoading || !videoUrl}>Get Info</Button>
-              <Button onClick={() => handleDownload('mp3')} disabled={isLoading || !videoUrl}>Download MP3</Button>
-              <Button onClick={() => handleDownload('mp4')} disabled={isLoading || !videoUrl}>Download MP4</Button>
-              <Button onClick={handleGetTranscript} disabled={isLoading || !videoUrl}>Get Transcript</Button>
+              <Button onClick={handleGetInfo} disabled={isFormDisabled || !videoUrl}>Get Info</Button>
+              <Button onClick={() => handleDownload('mp3')} disabled={isFormDisabled || !videoUrl}>Download MP3</Button>
+              <Button onClick={() => handleDownload('mp4')} disabled={isFormDisabled || !videoUrl}>Download MP4</Button>
+              <Button onClick={handleGetTranscript} disabled={isFormDisabled || !videoUrl}>Get Transcript</Button>
             </div>
           </div>
         </div>
@@ -191,9 +220,10 @@ const DashboardPage = () => {
         onOpenChange={setIsSidebarOpen}
         title={sidebarTitle}
         data={sidebarData}
-        isLoading={isLoading}
-        error={error}
+        isLoading={isSidebarLoading}
+        error={sidebarError} // Use the dedicated sidebarError state
       />
+      {console.log('[DashboardPage] Rendering ProcessSidebar. isSidebarOpen:', isSidebarOpen, 'isSidebarLoading:', isSidebarLoading, 'Error:', sidebarError, 'Data:', sidebarData)}
     </div>
   );
 };

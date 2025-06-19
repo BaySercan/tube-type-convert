@@ -63,43 +63,64 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   useEffect(() => {
+    console.log('[AuthContext] useEffect Mounting. Initializing...');
     // Initial session check
     setIsLoading(true);
+    console.log('[AuthContext] Initial getSession() call - setIsLoading(true)');
+
     supabase.auth.getSession().then(async ({ data: { session: initialSession } }) => {
+      console.log('[AuthContext] Initial getSession() success. Session:', initialSession);
       setSession(initialSession);
       const initialUser = initialSession?.user ?? null;
       setUser(initialUser);
+      console.log('[AuthContext] Initial user set:', initialUser?.id);
+
       if (initialUser) {
-        // Don't await here to avoid blocking initial load's setIsLoading(false)
+        console.log('[AuthContext] Initial user found, calling fetchUserProfile (not awaiting).');
         fetchUserProfile(initialUser.id);
       } else {
+        console.log('[AuthContext] No initial user, setUserProfile(null).');
         setUserProfile(null);
       }
-      setIsLoading(false); // Initial loading is done
-    }).catch(() => {
-      setIsLoading(false); // Ensure loading is false even on error
+      setIsLoading(false);
+      console.log('[AuthContext] Initial getSession() processed - setIsLoading(false)');
+    }).catch((error) => {
+      console.error('[AuthContext] Initial getSession() error:', error);
+      setIsLoading(false);
+      console.log('[AuthContext] Initial getSession() error - setIsLoading(false)');
     });
 
     // Listen for auth state changes
     const { data: authListener } = supabase.auth.onAuthStateChange(
       async (_event, newSession) => {
+        console.log('[AuthContext] onAuthStateChange triggered. Event:', _event, 'New Session:', newSession);
         setSession(newSession);
         const currentUser = newSession?.user ?? null;
         setUser(currentUser);
+        console.log('[AuthContext] onAuthStateChange - user set:', currentUser?.id);
 
         if (currentUser) {
-          // When auth state changes (login/logout), fetch profile.
-          // isLoadingProfile will cover this.
-          await fetchUserProfile(currentUser.id);
+          console.log('[AuthContext] onAuthStateChange - user found, attempting to fetchUserProfile (awaiting).');
+          try {
+            await fetchUserProfile(currentUser.id);
+            console.log('[AuthContext] onAuthStateChange - fetchUserProfile successful.');
+          } catch (profileError) {
+            console.error('[AuthContext] onAuthStateChange - error during fetchUserProfile:', profileError);
+            // Decide if setUserProfile(null) is appropriate here or if existing profile (if any) should be kept.
+            // For now, let's clear it if fetching fails to avoid stale profile data.
+            setUserProfile(null);
+          }
         } else {
+          console.log('[AuthContext] onAuthStateChange - no user, setUserProfile(null).');
           setUserProfile(null); // Clear profile if no user (logout)
         }
-        // `isLoading` is not set to true here, as this is an update, not initial load.
-        // The Navbar will react to `user` changing.
+        // isLoading should not be managed here for onAuthStateChange events after initial load.
+        console.log('[AuthContext] onAuthStateChange processing complete for user:', currentUser?.id);
       }
     );
 
     return () => {
+      console.log('[AuthContext] useEffect Cleanup. Unsubscribing auth listener.');
       authListener?.unsubscribe();
     };
   }, []); // fetchUserProfile is stable, no need to add to deps

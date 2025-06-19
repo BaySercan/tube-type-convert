@@ -8,9 +8,11 @@ import { Link, useNavigate } from 'react-router-dom'; // Import Link and useNavi
 import { supabase } from '@/lib/supabaseClient';
 
 const Navbar = () => {
-  const { user, signOut, isLoading } = useAuth();
+  const { user, signOut, isLoading, session } = useAuth(); // Added session for logging
   const navigate = useNavigate();
   const [isSigningIn, setIsSigningIn] = useState(false);
+
+  console.log('[Navbar] Rendering. isLoading:', isLoading, 'User:', user?.id, 'Session:', session?.access_token ? 'exists' : 'null');
 
   const handleSignIn = async () => {
     setIsSigningIn(true);
