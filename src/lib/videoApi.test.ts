@@ -7,6 +7,9 @@ vi.mock('./apiClient', () => ({
   authenticatedFetch: vi.fn(),
 }));
 
+const TEST_VIDEO_URL = "https://www.youtube.com/watch?v=iNMhWz8eJDc";
+const ENCODED_TEST_VIDEO_URL = encodeURIComponent(TEST_VIDEO_URL);
+
 // Helper to cast mock
 const mockedAuthenticatedFetch = authenticatedFetch as ReturnType<typeof vi.fn>;
 
@@ -18,16 +21,16 @@ describe('Video API Functions', () => {
 
   describe('getVideoInfo', () => {
     it('should fetch video info successfully', async () => {
-      const mockData = { title: 'Test Video', video_id: '123' };
+      const mockData = { title: 'Test Video', video_id: 'iNMhWz8eJDc' };
       mockedAuthenticatedFetch.mockResolvedValueOnce({
         ok: true,
         json: async () => mockData,
       } as Response);
 
-      const result = await videoApi.getVideoInfo('test_url');
+      const result = await videoApi.getVideoInfo(TEST_VIDEO_URL);
       expect(result).toEqual(mockData);
       expect(mockedAuthenticatedFetch).toHaveBeenCalledWith(
-        'http://localhost:3500/info?url=test_url'
+        `http://localhost:3500/info?url=${ENCODED_TEST_VIDEO_URL}`
       );
     });
 
@@ -38,25 +41,28 @@ describe('Video API Functions', () => {
         json: async () => ({ message: 'Failed to fetch' }),
       } as Response);
 
-      await expect(videoApi.getVideoInfo('test_url')).rejects.toThrow('Failed to fetch');
+      await expect(videoApi.getVideoInfo(TEST_VIDEO_URL)).rejects.toThrow('Failed to fetch');
     });
   });
 
   describe('downloadMp3', () => {
     it('should fetch MP3 blob successfully', async () => {
-      const mockBlob = new Blob(['mp3_content'], { type: 'audio/mpeg' });
+      const mockBlobContent = 'mp3_content_test';
+      const mockBlob = new Blob([mockBlobContent], { type: 'audio/mpeg' });
       mockedAuthenticatedFetch.mockResolvedValueOnce({
         ok: true,
         blob: async () => mockBlob,
       } as Response);
 
-      const result = await videoApi.downloadMp3('test_url');
+      const result = await videoApi.downloadMp3(TEST_VIDEO_URL);
       expect(result).toBeInstanceOf(Blob);
       expect(result.type).toBe('audio/mpeg');
-      const text = await result.text();
-      expect(text).toBe('mp3_content');
+      // Correct way to read blob text content in tests if needed
+      const buffer = await result.arrayBuffer();
+      const text = new TextDecoder().decode(buffer);
+      expect(text).toBe(mockBlobContent);
       expect(mockedAuthenticatedFetch).toHaveBeenCalledWith(
-        'http://localhost:3500/mp3?url=test_url'
+        `http://localhost:3500/mp3?url=${ENCODED_TEST_VIDEO_URL}`
       );
     });
 
@@ -66,25 +72,27 @@ describe('Video API Functions', () => {
         statusText: 'API Error',
         json: async () => ({ message: 'MP3 download failed' }),
       } as Response);
-      await expect(videoApi.downloadMp3('test_url')).rejects.toThrow('MP3 download failed');
+      await expect(videoApi.downloadMp3(TEST_VIDEO_URL)).rejects.toThrow('MP3 download failed');
     });
   });
 
   describe('downloadMp4', () => {
     it('should fetch MP4 blob successfully', async () => {
-      const mockBlob = new Blob(['mp4_content'], { type: 'video/mp4' });
+      const mockBlobContent = 'mp4_content_test';
+      const mockBlob = new Blob([mockBlobContent], { type: 'video/mp4' });
       mockedAuthenticatedFetch.mockResolvedValueOnce({
         ok: true,
         blob: async () => mockBlob,
       } as Response);
 
-      const result = await videoApi.downloadMp4('test_url');
+      const result = await videoApi.downloadMp4(TEST_VIDEO_URL);
       expect(result).toBeInstanceOf(Blob);
       expect(result.type).toBe('video/mp4');
-      const text = await result.text();
-      expect(text).toBe('mp4_content');
+      const buffer = await result.arrayBuffer();
+      const text = new TextDecoder().decode(buffer);
+      expect(text).toBe(mockBlobContent);
       expect(mockedAuthenticatedFetch).toHaveBeenCalledWith(
-        'http://localhost:3500/mp4?url=test_url'
+        `http://localhost:3500/mp4?url=${ENCODED_TEST_VIDEO_URL}`
       );
     });
 
@@ -94,7 +102,7 @@ describe('Video API Functions', () => {
         statusText: 'API Error',
         json: async () => ({ message: 'MP4 download failed' }),
       } as Response);
-      await expect(videoApi.downloadMp4('test_url')).rejects.toThrow('MP4 download failed');
+      await expect(videoApi.downloadMp4(TEST_VIDEO_URL)).rejects.toThrow('MP4 download failed');
     });
   });
 
@@ -106,16 +114,19 @@ describe('Video API Functions', () => {
         json: async () => mockData,
       } as Response);
 
-      const result = await videoApi.getVideoTranscript('test_url');
+      const result = await videoApi.getVideoTranscript(TEST_VIDEO_URL);
       expect(result).toEqual(mockData);
       const expectedParams = new URLSearchParams({
-        url: 'test_url',
+        url: TEST_VIDEO_URL, // URL should be encoded by URLSearchParams naturally if needed by underlying fetch
         lang: 'tr',
         skipAI: 'false',
         useDeepSeek: 'true',
       }).toString();
+      // Note: authenticatedFetch receives the URL already with query params,
+      // so we check the fully constructed URL here.
+      // The actual encoding of TEST_VIDEO_URL within the query string is handled by URLSearchParams.
       expect(mockedAuthenticatedFetch).toHaveBeenCalledWith(
-        `http://localhost:3500/transcript?${expectedParams}`
+        `http://localhost:3500/transcript?url=${ENCODED_TEST_VIDEO_URL}&lang=tr&skipAI=false&useDeepSeek=true`
       );
     });
 
@@ -126,17 +137,12 @@ describe('Video API Functions', () => {
         json: async () => mockData,
       } as Response);
 
-      const result = await videoApi.getVideoTranscript('test_url_en', 'en', true, false);
+      const result = await videoApi.getVideoTranscript(TEST_VIDEO_URL, 'en', true, false);
       expect(result).toEqual(mockData);
-      const expectedParams = new URLSearchParams({
-        url: 'test_url_en',
-        lang: 'en',
-        skipAI: 'true',
-        useDeepSeek: 'false',
-      }).toString();
-      expect(mockedAuthenticatedFetch).toHaveBeenCalledWith(
-        `http://localhost:3500/transcript?${expectedParams}`
-      );
+      // For `toHaveBeenCalledWith`, the URL params order can matter if not using a matcher.
+      // Let's construct it carefully.
+      const expectedUrl = `http://localhost:3500/transcript?url=${ENCODED_TEST_VIDEO_URL}&lang=en&skipAI=true&useDeepSeek=false`;
+      expect(mockedAuthenticatedFetch).toHaveBeenCalledWith(expectedUrl);
     });
 
     it('should throw an error if fetching transcript fails', async () => {
@@ -145,7 +151,7 @@ describe('Video API Functions', () => {
         statusText: 'API Error',
         json: async () => ({ message: 'Transcript fetch failed' }),
       } as Response);
-      await expect(videoApi.getVideoTranscript('test_url')).rejects.toThrow('Transcript fetch failed');
+      await expect(videoApi.getVideoTranscript(TEST_VIDEO_URL)).rejects.toThrow('Transcript fetch failed');
     });
   });
 

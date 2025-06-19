@@ -13,26 +13,29 @@ interface FetchOptions extends RequestInit {
  * @param options Optional fetch options (method, body, etc.).
  * @returns A Promise that resolves to the fetch Response.
  */
+import { getCustomApiToken } from './apiTokenStore'; // Import the getter for our custom API token
+
+// ... (supabase import might not be needed here anymore if only custom token is used)
+// import { supabase } from './supabaseClient';
+
+
 export const authenticatedFetch = async (
   url: string,
   options: FetchOptions = {}
 ): Promise<Response> => {
-  const { data: { session } } = await supabase.auth.getSession();
+  const customToken = getCustomApiToken(); // Get our custom API token
 
   const headers = new Headers(options.headers);
 
-  if (session?.access_token) {
-    headers.append('Authorization', `Bearer ${session.access_token}`);
+  if (customToken) {
+    headers.append('Authorization', `Bearer ${customToken}`);
+    console.log('[authenticatedFetch] Using Custom API Token for Authorization.');
   } else {
-    // Handle cases where there's no session (user not logged in)
-    // Depending on the API, you might want to:
-    // 1. Proceed without Authorization header (for public endpoints)
-    // 2. Throw an error to prevent the call
-    // 3. Redirect to login (though this should ideally be handled by ProtectedRoute or similar UI logic)
-    console.warn('No active session. API call will be made without Authorization header.');
-    // For now, we'll let it proceed, but in a real app, you might throw an error
-    // if the endpoint strictly requires authentication.
-    // Example: throw new Error("User not authenticated");
+    // This means the token exchange hasn't happened or failed.
+    // For your API (which expects its own JWT), proceeding without it will likely result in a 401/403.
+    console.warn('[authenticatedFetch] No Custom API Token available. Request will likely be unauthorized by the target API.');
+    // Optionally, you could throw an error here to prevent the call:
+    // throw new Error('Custom API token is not available. Cannot make authenticated request.');
   }
 
   console.log('[authenticatedFetch] Requesting URL:', url);
@@ -42,56 +45,15 @@ export const authenticatedFetch = async (
     const response = await fetch(url, {
       ...options,
       headers,
-      mode: 'cors', // Explicitly set mode, though usually default for cross-origin
+      mode: 'cors',
     });
 
-    // Optional: Basic error handling for 401 Unauthorized
-    // More sophisticated error handling (like redirecting to login or trying to refresh token explicitly)
-    // can be added here or in the calling code (e.g., react-query's onError).
     if (response.status === 401) {
       console.error('[authenticatedFetch] API request returned 401 Unauthorized. The token might be invalid or expired.');
-      // Potentially trigger a sign out or redirect here if appropriate for your app's UX.
     }
     return response;
   } catch (error) {
     console.error('[authenticatedFetch] Fetch call failed:', error);
-    // Re-throw the error so it can be caught by the calling function (in videoApi.ts, then DashboardPage.tsx)
-    // This ensures that the UI can update to show an error state.
     throw error;
   }
 };
-
-// Example of how to use it with @tanstack/react-query (for demonstration)
-// This would typically be in a file where you define your queries, e.g., src/hooks/useMyData.ts
-
-/*
-import { useQuery } from '@tanstack/react-query';
-import { authenticatedFetch } from '@/lib/apiClient';
-
-type MyData = {
-  id: string;
-  name: string;
-  // ... other properties
-};
-
-const fetchMyData = async (): Promise<MyData[]> => {
-  // Replace with your actual API endpoint
-  const response = await authenticatedFetch('/api/my-data'); // Assuming your API is on the same origin or proxied
-  // Or full URL: const response = await authenticatedFetch('https://your-api.com/my-data');
-
-  if (!response.ok) {
-    // Handle non-2xx responses (e.g., 404, 500)
-    const errorData = await response.json().catch(() => ({ message: response.statusText }));
-    throw new Error(errorData.message || `API request failed with status ${response.status}`);
-  }
-  return response.json();
-};
-
-export const useMyProtectedData = () => {
-  return useQuery<MyData[], Error>({
-    queryKey: ['myData'],
-    queryFn: fetchMyData,
-    // Options like `enabled: !!session` can be used if you get session from useAuth() here
-  });
-};
-*/
