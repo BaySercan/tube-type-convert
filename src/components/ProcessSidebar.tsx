@@ -9,9 +9,10 @@ import {
 } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Copy, ExternalLink, InfoIcon, AlertTriangleIcon } from "lucide-react"; // Added ExternalLink, InfoIcon, AlertTriangleIcon
+import { Copy, ExternalLink, InfoIcon, AlertTriangleIcon, Download, Loader2 } from "lucide-react"; // Added Download icon and Loader2
 import ReactJson from 'react-json-view';
 import { Progress } from "@/components/ui/progress"; // For displaying progress bar
+import React, { useState, useEffect } from 'react'; // Added useState and useEffect
 
 // Define a more specific type for the data prop
 // This helps in accessing properties safely
@@ -57,6 +58,75 @@ export const ProcessSidebar: React.FC<ProcessSidebarProps> = ({
   error = null,
 }) => {
 
+  const funnyWaitingMessages = [
+    "Reticulating splines...",
+    "Generating witty dialog...",
+    "Swapping time and space...",
+    "Spinning up the hamster...",
+    "Shoveling coal into the server...",
+    "Programming the flux capacitor...",
+    "Realigning the dilithium crystals...",
+    "Definitely not mining crypto...",
+    "Almost there, maybe...",
+    "Still faster than a fax machine!",
+    "Hold on, our AI is composing a sonnet about your request.",
+    "Are we there yet?",
+    "Just counting to infinity, be right with you.",
+    "Warming up the tubes...",
+    "Polishing the pixels...",
+  ];
+
+  const [currentLoadingMessage, setCurrentLoadingMessage] = useState(funnyWaitingMessages[0]);
+  const [timerStartTime, setTimerStartTime] = useState<number | null>(null);
+  const [elapsedTime, setElapsedTime] = useState(0);
+
+  useEffect(() => {
+    let messageInterval: NodeJS.Timeout;
+    if (isLoading && !data?.progress) { // Only cycle if it's the initial loading state for funny messages
+      setCurrentLoadingMessage(funnyWaitingMessages[Math.floor(Math.random() * funnyWaitingMessages.length)]);
+      messageInterval = setInterval(() => {
+        setCurrentLoadingMessage(funnyWaitingMessages[Math.floor(Math.random() * funnyWaitingMessages.length)]);
+      }, 3000);
+    }
+    return () => {
+      clearInterval(messageInterval);
+    };
+  }, [isLoading, data?.progress]); // Rerun effect if isLoading or progress status changes
+
+  // Timer effect for AI transcript
+  useEffect(() => {
+    let timerInterval: NodeJS.Timeout;
+    const shouldRunTimer = isTranscriptRequest && (isPollingProgress || (isLoading && !data?.progress && !error));
+
+    if (shouldRunTimer && timerStartTime === null) {
+      setTimerStartTime(Date.now());
+      setElapsedTime(0); // Reset elapsed time
+    }
+
+    if (shouldRunTimer && timerStartTime !== null) {
+      timerInterval = setInterval(() => {
+        setElapsedTime(Date.now() - timerStartTime);
+      }, 1000);
+    } else {
+      // Stop timer if conditions are no longer met (e.g., process completed or failed)
+      setTimerStartTime(null); // This will also stop new intervals from being created
+      // Elapsed time will naturally stop updating here. We can keep the last value or reset.
+      // For now, keep the last value until a new process starts.
+    }
+
+    return () => {
+      clearInterval(timerInterval);
+    };
+  }, [isTranscriptRequest, isPollingProgress, isLoading, data?.progress, error, timerStartTime]);
+
+
+  const formatTime = (ms: number): string => {
+    const totalSeconds = Math.floor(ms / 1000);
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+  };
+
   const handleCopyJson = () => {
     if (data) {
       // Only copy the parts that are actual JSON results, not our UI state properties
@@ -79,6 +149,7 @@ export const ProcessSidebar: React.FC<ProcessSidebarProps> = ({
   const isFinalData = data && !data.processingId && !data.progressEndpoint && data.status !== 'processing_initiated' && typeof data.progress === 'undefined';
   const isAsyncJobInitial = data && data.processingId && data.status === 'processing_initiated';
   const isPollingProgress = data && data.processingId && typeof data.progress === 'number' && data.status !== 'completed' && data.status !== 'failed' && data.status !== "result_error" && data.status !== "processing_failed";
+  const isTranscriptRequest = title.toLowerCase().includes("transcript");
 
   // Data specifically for ReactJson (filtering out our custom polling/status fields if they are mixed)
   const jsonDataForViewer = data ? Object.fromEntries(
@@ -93,17 +164,22 @@ export const ProcessSidebar: React.FC<ProcessSidebarProps> = ({
 
   return (
     <Sheet open={isOpen} onOpenChange={onOpenChange}>
-      <SheetContent className="sm:max-w-lg w-[90vw] flex flex-col">
+      <SheetContent className="sm:max-w-2xl w-[90vw] flex flex-col"> {/* Changed sm:max-w-lg to sm:max-w-2xl */}
         <SheetHeader>
           <SheetTitle>{title}</SheetTitle>
           <SheetDescription>
-            {isLoading && !data?.progress ? "Processing your request..." : (error ? "An error occurred." : "View the process details below.")}
+            {isLoading && !data?.progress ? (
+              <div className="flex items-center space-x-2 text-sm text-gray-300">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span>{currentLoadingMessage}</span>
+              </div>
+            ) : (error ? "An error occurred." : "View the process details below.")}
             {data?.lastUpdated && <span className="text-xs block text-gray-400">Last updated: {data.lastUpdated}</span>}
           </SheetDescription>
         </SheetHeader>
 
         {/* Warning Message */}
-        <div className="p-3 mx-1 mt-2 border border-yellow-500 bg-yellow-900/30 rounded-md text-yellow-300 text-xs">
+        <div className="p-3 mx-1 mt-2 border border-yellow-500 bg-yellow-900/30 rounded-md text-yellow-200 text-xs"> {/* Changed text-yellow-300 to text-yellow-200 */}
           <div className="flex items-center space-x-2">
             <AlertTriangleIcon className="h-5 w-5 text-yellow-400 flex-shrink-0" />
             <p>
@@ -113,9 +189,28 @@ export const ProcessSidebar: React.FC<ProcessSidebarProps> = ({
         </div>
 
         <ScrollArea className="flex-grow my-2 pr-6 space-y-4">
+          {/* AI Transcript Warning */}
+          {isTranscriptRequest && (isPollingProgress || (isLoading && !data?.progress && !error)) && (
+            <div className="p-3 my-2 border border-blue-500 bg-blue-900/30 rounded-md text-blue-200 text-xs">
+              <div className="flex items-center space-x-2">
+                <InfoIcon className="h-5 w-5 text-blue-400 flex-shrink-0" />
+                <p>
+                  AI transcription can take some time depending on the video length. Please be patient.
+                </p>
+              </div>
+              {timerStartTime !== null && (
+                <div className="mt-2 text-center text-sm text-blue-300">
+                  Elapsed Time: {formatTime(elapsedTime)}
+                </div>
+              )}
+            </div>
+          )}
+
           {isLoading && !data?.progress && ( // Show general loading spinner if no progress yet
-            <div className="flex items-center justify-center h-full">
-              <p>Loading...</p>
+            <div className="flex flex-col items-center justify-center h-full space-y-3 text-center">
+              <Loader2 className="h-10 w-10 animate-spin text-blue-400" />
+              <p className="text-lg font-medium text-gray-200">{currentLoadingMessage}</p>
+              <p className="text-sm text-gray-400">Please wait a moment...</p>
             </div>
           )}
 
@@ -142,22 +237,22 @@ export const ProcessSidebar: React.FC<ProcessSidebarProps> = ({
 
           {/* Media Player Section */}
           {data?.mediaUrl && data.mediaType && (
-            <div className="p-3 border border-gray-700 rounded-md space-y-3">
-              <h4 className="font-semibold text-sm text-gray-300">Media Preview:</h4>
+            <div className="p-4 bg-slate-800/60 border border-slate-700 rounded-lg space-y-4 shadow-md"> {/* Enhanced container styling */}
+              <h4 className="font-semibold text-base text-gray-100">Media Preview:</h4> {/* Increased text size */}
               {data.mediaType.startsWith('audio/') && (
-                <audio controls src={data.mediaUrl} className="w-full">
+                <audio controls src={data.mediaUrl} className="w-full border border-slate-600 rounded-md"> {/* Added border to audio player */}
                   Your browser does not support the audio element.
                 </audio>
               )}
               {data.mediaType.startsWith('video/') && (
-                <video controls src={data.mediaUrl} className="w-full rounded" style={{maxHeight: '300px'}}>
+                <video controls src={data.mediaUrl} className="w-full rounded-md border border-slate-600" style={{maxHeight: '300px'}}> {/* Added border to video player */}
                   Your browser does not support the video tag.
                 </video>
               )}
               {data.fileName && (
                  <Button
-                    variant="outline"
-                    className="w-full"
+                    variant="default" // Changed to default, assuming it's more prominent
+                    className="w-full h-12 text-base font-semibold bg-blue-600 hover:bg-blue-500 text-white flex items-center justify-center space-x-2" // Enhanced button styling
                     onClick={() => {
                       const link = document.createElement('a');
                       link.href = data.mediaUrl!;
@@ -167,30 +262,66 @@ export const ProcessSidebar: React.FC<ProcessSidebarProps> = ({
                       document.body.removeChild(link);
                     }}
                   >
-                    Download {data.fileName}
+                    <Download className="h-5 w-5 mr-2" /> {/* Added Download icon */}
+                    <span>Download {data.fileName}</span>
                   </Button>
               )}
+              <p className="text-xs text-gray-400 text-center mt-2">
+                If the download didn't start automatically, click the button above.
+              </p>
             </div>
           )}
 
           {/* Display for Polling Progress */}
           {isPollingProgress && data && (
             <div className="space-y-2 p-3 border border-gray-700 rounded-md">
-              {data.video_title && <p className="text-sm font-medium">Video: {data.video_title}</p>}
-              <p className="text-sm">Status: <span className="font-semibold">{data.status}</span></p>
+              {data.video_title && <p className="text-sm font-medium text-gray-100">Video: {data.video_title}</p>} {/* Added text-gray-100 for better contrast */}
+              <p className="text-sm text-gray-200">Status: <span className="font-semibold text-gray-100">{data.status}</span></p> {/* Added text-gray-200/100 for better contrast */}
               {typeof data.progress === 'number' && (
                 <>
-                  <Progress value={data.progress} className="w-full h-3" />
-                  <p className="text-sm text-right">{data.progress}% complete</p>
+                  <Progress value={data.progress} className="w-full h-5" /> {/* Increased height from h-3 to h-5 */}
+                  <p className="text-sm text-right text-gray-300">{data.progress}% complete</p> {/* Added text-gray-300 for better contrast */}
                 </>
               )}
             </div>
           )}
 
-          {/* Display Endpoints if available (from initial 202 or progress) */}
+          {/* Display JSON data using ReactJson viewer */}
+          {/* This will show the final result, or the initial 202 object if not handled above */}
+          {data && !error && hasJsonDataForViewer && (
+             <div className="bg-gray-800 text-white p-3 rounded-md relative group border border-gray-700">
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-xs font-semibold text-gray-200"> {/* Changed text-gray-400 to text-gray-200 */}
+                  {isFinalData ? "Final Result JSON" : "Response Data"}
+                </span>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7 opacity-50 group-hover:opacity-100 transition-opacity"
+                  onClick={handleCopyJson}
+                  title="Copy JSON"
+                >
+                  <Copy className="h-4 w-4" />
+                </Button>
+              </div>
+              <ReactJson
+                src={jsonDataForViewer}
+                theme="ocean"
+                iconStyle="square"
+                displayDataTypes={false}
+                displayObjectSize={false}
+                name={false}
+                style={{ background: 'transparent', fontSize: '0.8rem' }}
+                collapsed={1} // Collapse deeper levels
+                enableClipboard={true} // Explicitly enable clipboard, though it's default
+              />
+            </div>
+          )}
+
+          {/* Display Endpoints if available (from initial 202 or progress) - MOVED TO BOTTOM */}
           {data && (data.progressEndpoint || data.resultEndpoint) && (
-            <div className="space-y-2 p-3 border border-gray-700 rounded-md">
-              <h4 className="font-semibold text-sm text-gray-300">API Endpoints:</h4>
+            <div className="mt-4 space-y-2 p-3 border border-gray-700 rounded-md bg-gray-800/50">
+              <h4 className="font-semibold text-sm text-gray-100">API Endpoints:</h4>
               {data.progressEndpoint && (
                 <div className="flex items-center space-x-2">
                   <Button
@@ -216,40 +347,9 @@ export const ProcessSidebar: React.FC<ProcessSidebarProps> = ({
             </div>
           )}
 
-          {/* Display JSON data using ReactJson viewer */}
-          {/* This will show the final result, or the initial 202 object if not handled above */}
-          {data && !error && hasJsonDataForViewer && (
-             <div className="bg-gray-800 text-white p-3 rounded-md relative group border border-gray-700">
-              <div className="flex justify-between items-center mb-2">
-                <span className="text-xs font-semibold text-gray-400">
-                  {isFinalData ? "Final Result JSON" : "Response Data"}
-                </span>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-7 w-7 opacity-50 group-hover:opacity-100 transition-opacity"
-                  onClick={handleCopyJson}
-                  title="Copy JSON"
-                >
-                  <Copy className="h-4 w-4" />
-                </Button>
-              </div>
-              <ReactJson
-                src={jsonDataForViewer}
-                theme="ocean"
-                iconStyle="square"
-                displayDataTypes={false}
-                displayObjectSize={false}
-                name={false}
-                style={{ background: 'transparent', fontSize: '0.8rem' }}
-                collapsed={1} // Collapse deeper levels
-              />
-            </div>
-          )}
-
           {!isLoading && !error && !data && (
              <div className="flex items-center justify-center h-full">
-              <p className="text-gray-400">No data to display yet.</p>
+              <p className="text-gray-400">No data to display yet.</p> {/* This could also be brightened if needed, e.g. text-gray-300 */}
             </div>
           )}
         </ScrollArea>
