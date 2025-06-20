@@ -5,18 +5,38 @@ import { ProcessSidebar } from "@/components/ProcessSidebar";
 import { supabase } from "@/lib/supabaseClient";
 import { useNavigate } from "react-router-dom";
 import * as videoApi from '@/lib/videoApi';
-import { useMutation, useQueryClient } from '@tanstack/react-query'; // Import useMutation
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 
 const DashboardPage = () => {
-  const { user } = useAuth();
+  const { user, customApiTokenError, isLoadingApiToken } = useAuth(); // Get token error and loading state
   const navigate = useNavigate();
-  // const queryClient = useQueryClient(); // If needed for cache invalidation
+  // const queryClient = useQueryClient();
 
   const [videoUrl, setVideoUrl] = useState("");
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [sidebarData, setSidebarData] = useState<object | null>(null); // Retain for sidebar direct data
+  const [sidebarData, setSidebarData] = useState<object | null>(null);
   const [sidebarTitle, setSidebarTitle] = useState("Process Details");
-  // isLoading and error will now primarily come from useMutation states
+  const [sidebarError, setErrorForSidebar] = useState<string | null>(null); // Already exists
+
+  // Logging for sidebar state changes
+  useEffect(() => {
+    console.log('[DashboardPage] isSidebarOpen changed:', isSidebarOpen);
+  }, [isSidebarOpen]);
+
+  useEffect(() => {
+    console.log('[DashboardPage] sidebarTitle changed:', sidebarTitle);
+  }, [sidebarTitle]);
+
+  useEffect(() => {
+    console.log('[DashboardPage] sidebarError changed:', sidebarError);
+  }, [sidebarError]);
+
+  useEffect(() => {
+    console.log('[DashboardPage] sidebarData changed:', sidebarData);
+  }, [sidebarData]);
+
+  // Note: isSidebarLoading is derived from mutations, its changes can be logged via mutation status if needed.
+
 
   const handleLogout = async () => {
     const { error } = await supabase.auth.signOut();
@@ -61,8 +81,11 @@ const DashboardPage = () => {
       alert("Please enter a video URL.");
       return;
     }
-    openSidebarForAction("Fetching Video Info...");
-    infoMutation.mutate(videoUrl);
+    console.log("[DashboardPage] DEBUG: Forcing sidebar open with mock error.");
+    openSidebarForAction("DEBUG: Test Sidebar Opening"); // Sets isSidebarOpen = true
+    setErrorForSidebar("DEBUG: This is a forced error message to test sidebar visibility.");
+    setSidebarData({ debug: "Sidebar forced open for testing." }); // Add some mock data too
+    // infoMutation.mutate(videoUrl); // Temporarily bypass actual API call
   };
 
   // isLoading for the form/buttons will be a composite of all mutation loading states
@@ -186,6 +209,19 @@ const DashboardPage = () => {
       </header>
       <main>
         <p className="text-lg">Welcome, <strong>{user?.email || 'Authenticated User'}</strong>!</p>
+
+        {isLoadingApiToken && (
+          <div className="mt-4 p-4 bg-blue-100 border border-blue-400 text-blue-700 rounded">
+            <p>Authenticating with API service...</p>
+          </div>
+        )}
+
+        {customApiTokenError && (
+          <div className="mt-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded">
+            <p><strong>API Authentication Error:</strong> {customApiTokenError}</p>
+            <p>Video conversion tools may not be available. Please try signing out and signing back in. If the issue persists, contact support.</p>
+          </div>
+        )}
 
         <div className="mt-8">
           <h2 className="text-2xl font-semibold mb-4">Video Tools</h2>

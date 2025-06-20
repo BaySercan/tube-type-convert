@@ -20,6 +20,7 @@ type AuthContextType = {
   isLoadingProfile: boolean; // True if Supabase user profile is loading
   isLoadingApiToken: boolean; // True if exchanging Supabase token for custom API token
   customApiToken: string | null; // The JWT for your custom API
+  customApiTokenError: string | null; // Error message from token exchange failure
   signOut: () => Promise<void>;
   fetchUserProfile: (userId: string) => Promise<void>;
   // exchangeToken: () => Promise<void>; // Might be called internally or exposed if needed
@@ -35,12 +36,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isLoading, setIsLoading] = useState(true); // For initial Supabase session
   const [isLoadingProfile, setIsLoadingProfile] = useState(false);
   const [isLoadingApiToken, setIsLoadingApiToken] = useState(false);
+  const [customApiTokenError, setCustomApiTokenError] = useState<string | null>(null);
 
   const exchangeSupabaseTokenForApiToken = async (supabaseAccessToken: string): Promise<void> => {
-    if (!supabaseAccessToken) return;
+    if (!supabaseAccessToken) {
+      setCustomApiTokenError("Supabase access token not available for exchange."); // Should not happen if called correctly
+      return;
+    }
     console.log('[AuthContext] Attempting to exchange Supabase token for custom API token.');
     setIsLoadingApiToken(true);
-    setCustomApiToken(null); // Clear old token if any
+    setCustomApiToken(null);
+    storeTokenInGlobalStore(null); // Clear from global store when attempting
+    setCustomApiTokenError(null); // Clear previous errors
 
     try {
       const response = await fetch('http://localhost:3500/auth/exchange-token', {
@@ -64,16 +71,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setCustomApiToken(data.apiToken);
         storeTokenInGlobalStore(data.apiToken);
         console.log('[AuthContext] Custom API token received and stored in context and global store.');
+        setCustomApiTokenError(null); // Clear any previous error on success
         // Optionally, schedule a refresh based on data.expiresIn if needed
       } else {
-        console.error('[AuthContext] Token exchange response missing apiToken.');
-        throw new Error('Token exchange response missing apiToken.');
+        const errorMsg = 'Token exchange response missing apiToken.';
+        console.error(`[AuthContext] ${errorMsg}`);
+        setCustomApiTokenError(errorMsg);
+        throw new Error(errorMsg);
       }
-    } catch (error) {
-      console.error('[AuthContext] Error during token exchange:', error);
+    } catch (error: unknown) {
+      let message = 'An unknown error occurred during token exchange.';
+      if (error instanceof Error) {
+        message = error.message;
+      }
+      console.error('[AuthContext] Error during token exchange:', message);
       setCustomApiToken(null);
-      storeTokenInGlobalStore(null); // Clear from global store on error
-      // Optionally, propagate the error or handle it (e.g., by signing the user out or showing a global error)
+      storeTokenInGlobalStore(null);
+      setCustomApiTokenError(message);
     } finally {
       setIsLoadingApiToken(false);
     }
@@ -139,7 +153,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       console.error('[AuthContext] Initial getSession() error:', error);
       setIsLoading(false);
       setCustomApiToken(null);
-      storeTokenInGlobalStore(null); // Clear from global store
+      storeTokenInGlobalStore(null);
+      setCustomApiTokenError('Failed to initialize session.'); // Set error here
       console.log('[AuthContext] Initial getSession() error - setIsLoading(false)');
     });
 
@@ -163,7 +178,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           console.log('[AuthContext] onAuthStateChange - User is null (e.g., signed out). Clearing profile and custom API token.');
           setUserProfile(null);
           setCustomApiToken(null);
-          storeTokenInGlobalStore(null); // Clear from global store
+          storeTokenInGlobalStore(null);
+          setCustomApiTokenError(null); // Clear token exchange error
         }
 
         if (_event === 'INITIAL_SESSION' || _event === 'SIGNED_IN' || _event === 'SIGNED_OUT') {
@@ -195,8 +211,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     // Explicitly clear profile here for immediate UI update if desired,
     // though onAuthStateChange should also handle clearing it.
     setUserProfile(null);
-    setCustomApiToken(null); // Clear from context
-    storeTokenInGlobalStore(null); // Clear from global store
+    setCustomApiToken(null);
+    storeTokenInGlobalStore(null);
+    setCustomApiTokenError(null); // Clear token exchange error
     // No need to manually set user/session to null, authListener handles it.
   };
 
@@ -204,13 +221,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     session,
     user,
     userProfile,
-    customApiToken, // Add customApiToken to context value
+    customApiToken,
+    customApiTokenError, // Expose the error state
     isLoading,
     isLoadingProfile,
-    isLoadingApiToken, // Add isLoadingApiToken to context value
+    isLoadingApiToken,
     signOut: wrappedSignOut,
     fetchUserProfile,
-    // exchangeSupabaseTokenForApiToken, // Expose if manual trigger is needed elsewhere
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

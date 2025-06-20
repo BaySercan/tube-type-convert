@@ -33,9 +33,10 @@ export const authenticatedFetch = async (
   } else {
     // This means the token exchange hasn't happened or failed.
     // For your API (which expects its own JWT), proceeding without it will likely result in a 401/403.
-    console.warn('[authenticatedFetch] No Custom API Token available. Request will likely be unauthorized by the target API.');
-    // Optionally, you could throw an error here to prevent the call:
-    // throw new Error('Custom API token is not available. Cannot make authenticated request.');
+    console.error('[authenticatedFetch] Critical Error: No Custom API Token available. Cannot make authenticated request.');
+    // Throw an error to ensure this failure is propagated to the caller (React Query mutation)
+    // This error will then be displayed in the sidebar.
+    throw new Error('Authentication token for API is missing. Please try signing out and in again.');
   }
 
   console.log('[authenticatedFetch] Requesting URL:', url);
