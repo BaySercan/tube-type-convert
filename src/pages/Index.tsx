@@ -65,9 +65,9 @@ const Index = () => {
 
   const handleSidebarOpenChange = (isOpen: boolean) => {
     setIsSidebarOpen(isOpen);
-    if (!isOpen) {
-      if (sidebarData || sidebarError) {
-        setShowReopenButton(true); // Show button if sidebar is closed and has content
+    if (!isOpen) { // When sidebar is closing
+      if (sidebarData || sidebarError || activeBlobUrl) { // Also show if there's an active blob URL
+        setShowReopenButton(true);
       }
       if (activeBlobUrl) {
         console.log('[IndexPage] Sidebar closed, revoking active blob URL:', activeBlobUrl);
@@ -317,51 +317,8 @@ const Index = () => {
       setActiveBlobUrl(null);
     }
 
-    if (!user) {
-      const { update: updateToast } = toast({
-    if (!user) {
-      const { update: updateToast } = toast({
-        id: 'auth-toast',
-        title: "Authentication Required",
-        description: "Please sign in to start a video conversion.",
-        variant: "destructive",
-        action: (
-          <ToastAction
-            altText="Sign in with Google"
-            onClick={async () => {
-              updateToast({
-                id: 'auth-toast',
-                title: "Signing in with Google...",
-                description: (
-                  <div style={{ display: 'flex', alignItems: 'center' }}>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Please wait...
-                  </div>
-                ),
-                action: null,
-                open: true,
-                variant: "default",
-              });
-              const { error } = await supabase.auth.signInWithOAuth({ provider: 'google' });
-              if (error) {
-                console.error("Error logging in with Google from toast:", error.message);
-                updateToast({
-                  id: 'auth-toast',
-                  title: "Sign-In Error",
-                  description: error.message,
-                  action: null,
-                  open: true,
-                  variant: "destructive",
-                });
-              }
-            }}
-          >
-            Sign in with Google
-          </ToastAction>
-        ),
-      });
-      return;
-    }
+    // The duplicated if (!user) block was removed from here.
+    // The first if (!user) block starting around line 313 is the correct one.
 
     if (!url.trim()) {
       toast({ title: "URL Required", description: "Please enter a YouTube URL", variant: "destructive" });
@@ -504,7 +461,7 @@ const Index = () => {
                 <div className="relative flex items-center justify-center space-x-3">
                   {isProcessing ? (
                     <>
-                      <div className="w-6 h-6 border-2 border-white/40 border-t-white rounded-full animate-spin"></div>
+                      <Loader2 className="h-6 w-6 animate-spin" />
                       <span>Processing...</span>
                     </>
                   ) : (
@@ -541,10 +498,10 @@ const Index = () => {
             setIsSidebarOpen(true);
             setShowReopenButton(false); // Hide button once sidebar is reopened
           }}
-          className="fixed top-1/2 right-0 -translate-y-1/2 z-50 bg-gray-700 hover:bg-gray-600 text-white p-3 rounded-l-md shadow-lg"
+          className="fixed top-1/2 right-0 -translate-y-1/2 z-50 bg-slate-600 hover:bg-slate-500 text-white p-4 rounded-l-lg shadow-xl animate-pulse border-2 border-slate-400" // Increased padding, new bg, larger rounded corners, shadow, pulse, border
           title="Reopen Sidebar"
         >
-          <ChevronsLeft className="h-6 w-6" />
+          <ChevronsLeft className="h-8 w-8" /> {/* Increased icon size */}
         </Button>
       )}
 
