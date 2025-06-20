@@ -80,6 +80,12 @@ export const ProcessSidebar: React.FC<ProcessSidebarProps> = ({
   const [timerStartTime, setTimerStartTime] = useState<number | null>(null);
   const [elapsedTime, setElapsedTime] = useState(0);
 
+  // Moved constant declarations before useEffect hooks that depend on them
+  const isFinalData = data && !data.processingId && !data.progressEndpoint && data.status !== 'processing_initiated' && typeof data.progress === 'undefined';
+  const isAsyncJobInitial = data && data.processingId && data.status === 'processing_initiated';
+  const isPollingProgress = data && data.processingId && typeof data.progress === 'number' && data.status !== 'completed' && data.status !== 'failed' && data.status !== "result_error" && data.status !== "processing_failed";
+  const isTranscriptRequest = title.toLowerCase().includes("transcript");
+
   useEffect(() => {
     let messageInterval: NodeJS.Timeout;
     if (isLoading && !data?.progress) { // Only cycle if it's the initial loading state for funny messages
@@ -145,11 +151,6 @@ export const ProcessSidebar: React.FC<ProcessSidebarProps> = ({
         .catch(err => console.error("Failed to copy filtered JSON: ", err));
     }
   };
-
-  const isFinalData = data && !data.processingId && !data.progressEndpoint && data.status !== 'processing_initiated' && typeof data.progress === 'undefined';
-  const isAsyncJobInitial = data && data.processingId && data.status === 'processing_initiated';
-  const isPollingProgress = data && data.processingId && typeof data.progress === 'number' && data.status !== 'completed' && data.status !== 'failed' && data.status !== "result_error" && data.status !== "processing_failed";
-  const isTranscriptRequest = title.toLowerCase().includes("transcript");
 
   // Data specifically for ReactJson (filtering out our custom polling/status fields if they are mixed)
   const jsonDataForViewer = data ? Object.fromEntries(
