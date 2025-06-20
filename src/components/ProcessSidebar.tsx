@@ -103,29 +103,36 @@ export const ProcessSidebar: React.FC<ProcessSidebarProps> = ({
 
   // Timer effect for AI transcript
   useEffect(() => {
+    console.log('[TimerEffect] Running. Deps:', { isTranscriptRequest, isPollingProgress, isLoading, dataStatus: data?.status, dataProgress: data?.progress, error, timerStartTime });
     let timerInterval: NodeJS.Timeout;
     const shouldRunTimer = isTranscriptRequest && (isPollingProgress || (isLoading && !data?.progress && !error));
+    console.log('[TimerEffect] shouldRunTimer:', shouldRunTimer);
 
     if (shouldRunTimer && timerStartTime === null) {
+      console.log('[TimerEffect] Starting timer.');
       setTimerStartTime(Date.now());
       setElapsedTime(0); // Reset elapsed time
     }
 
     if (shouldRunTimer && timerStartTime !== null) {
+      console.log('[TimerEffect] Setting up interval. Current elapsedTime:', elapsedTime);
       timerInterval = setInterval(() => {
-        setElapsedTime(Date.now() - timerStartTime);
+        setElapsedTime(prevElapsedTime => Date.now() - timerStartTime);
       }, 1000);
-    } else {
-      // Stop timer if conditions are no longer met (e.g., process completed or failed)
-      setTimerStartTime(null); // This will also stop new intervals from being created
-      // Elapsed time will naturally stop updating here. We can keep the last value or reset.
-      // For now, keep the last value until a new process starts.
+    } else if (!shouldRunTimer && timerStartTime !== null) {
+      // If timer was running but should now stop
+      console.log('[TimerEffect] Stopping timer because shouldRunTimer is false.');
+      // setTimerStartTime(null); // Keep timerStartTime to display final time until new process
+                               // Or set to null if timer should disappear completely. Let's try keeping it for now.
+                               // If a new transcript process starts, the (shouldRunTimer && timerStartTime === null) condition will reset it.
     }
 
+
     return () => {
+      console.log('[TimerEffect] Cleanup: Clearing interval.');
       clearInterval(timerInterval);
     };
-  }, [isTranscriptRequest, isPollingProgress, isLoading, data?.progress, error, timerStartTime]);
+  }, [isTranscriptRequest, isPollingProgress, isLoading, data?.status, data?.progress, error, timerStartTime]); // Added data.status to deps for more precise reaction to polling changes
 
 
   const formatTime = (ms: number): string => {
@@ -185,9 +192,9 @@ export const ProcessSidebar: React.FC<ProcessSidebarProps> = ({
         </SheetHeader>
 
         {/* Warning Message */}
-        <div className="p-3 mx-1 mt-2 border border-yellow-500 bg-yellow-900/40 rounded-md text-yellow-100 text-xs"> {/* Changed text-yellow-200 to text-yellow-100 and increased bg opacity */}
+        <div className="p-3 mx-1 mt-2 border border-red-600 bg-red-800/80 rounded-md text-red-100 text-xs"> {/* Changed to red theme for higher alert */}
           <div className="flex items-center space-x-2">
-            <AlertTriangleIcon className="h-5 w-5 text-yellow-300 flex-shrink-0" /> {/* Adjusted icon color slightly for better harmony */}
+            <AlertTriangleIcon className="h-5 w-5 text-red-300 flex-shrink-0" /> {/* Icon to match red theme */}
             <p>
               <strong>Important:</strong> Results displayed here are temporary. Please save your data (copy JSON, download files) as it will be lost when you close this panel or start a new process.
             </p>
@@ -197,25 +204,47 @@ export const ProcessSidebar: React.FC<ProcessSidebarProps> = ({
         <ScrollArea className="flex-grow my-2 pr-6 space-y-4">
           {/* AI Transcript Warning */}
           {isTranscriptRequest && (isPollingProgress || (isLoading && !data?.progress && !error)) && (
-            <div className="p-3 my-2 border border-blue-500 bg-blue-900/30 rounded-md text-blue-200 text-xs">
+            <div className="p-3 my-2 border border-sky-600 bg-sky-700/60 rounded-md text-sky-100 text-xs shadow"> {/* Changed to sky theme */}
               <div className="flex items-center space-x-2">
-                <InfoIcon className="h-5 w-5 text-blue-400 flex-shrink-0" />
+                <InfoIcon className="h-5 w-5 text-sky-300 flex-shrink-0" /> {/* Icon to match sky theme */}
                 <p>
                   AI transcription can take some time depending on the video length. Please be patient.
                 </p>
               </div>
-              {timerStartTime !== null && (
-                <div className="mt-2 text-center text-sm text-blue-300">
-                  Elapsed Time: {formatTime(elapsedTime)}
-                </div>
-              )}
+            </div>
+          )}
+
+          {/* Display Original URL for Transcript Requests */}
+          {isTranscriptRequest && data?.originalUrl && (isPollingProgress || (isLoading && !data?.progress && !error)) && (
+            <div className="p-3 my-2 border border-slate-600 bg-slate-700/50 rounded-md text-slate-200 text-sm shadow">
+              <p>
+                AI transcript requested for: <br />
+                <a
+                  href={data.originalUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-400 hover:text-blue-300 hover:underline break-all inline-flex items-center"
+                >
+                  {data.originalUrl} <ExternalLink className="inline-block ml-1.5 h-4 w-4 flex-shrink-0" />
+                </a>
+              </p>
+            </div>
+          )}
+
+          {/* Timer Display - Placed outside the AI warning, but still conditional on transcript request & timer having started */}
+          {isTranscriptRequest && timerStartTime !== null && (
+            <div className="my-3 p-3 bg-slate-700 rounded-md text-center shadow">
+              <p className="text-xs text-slate-300 mb-1">Elapsed Time</p>
+              <p className="text-2xl font-mono text-cyan-400 tracking-wider">
+                {formatTime(elapsedTime)}
+              </p>
             </div>
           )}
 
           {isLoading && !data?.progress && ( // Show general loading spinner if no progress yet
             <div className="flex flex-col items-center justify-center h-full space-y-3 text-center">
               <Loader2 className="h-10 w-10 animate-spin text-blue-400" />
-              <p className="text-lg font-medium text-gray-100">{currentLoadingMessage}</p> {/* Changed text-gray-200 to text-gray-100 */}
+              <p className="text-lg font-medium text-white">{currentLoadingMessage}</p> {/* Changed text-gray-100 to text-white */}
               {/* Removed: <p className="text-sm text-gray-400">Please wait a moment...</p> */}
             </div>
           )}
@@ -319,15 +348,25 @@ export const ProcessSidebar: React.FC<ProcessSidebarProps> = ({
                 name={false}
                 style={{ background: 'transparent', fontSize: '0.8rem' }}
                 collapsed={1} // Collapse deeper levels
-                enableClipboard={true} // Explicitly enable clipboard, though it's default
+                enableClipboard={(copy) => {
+                  // This function will be called by react-json-view with the data to be copied
+                  // The library handles the actual clipboard writing.
+                  // We can log here to confirm it's firing.
+                  console.log('ReactJson copy event:', copy);
+                  // Default behavior is to copy copy.src or JSON.stringify(copy.src)
+                  // No need to call navigator.clipboard.writeText here unless we want to override.
+                  // To ensure the library's default copy works, we should return true or nothing.
+                  // If we wanted to PREVENT copy, we'd return false.
+                }}
+                iconStyle="circle" // Changed from "square" to "circle" to see if it affects visibility/interaction
               />
             </div>
           )}
 
           {/* Display Endpoints if available (from initial 202 or progress) - MOVED TO BOTTOM */}
           {data && (data.progressEndpoint || data.resultEndpoint) && (
-            <div className="mt-4 space-y-2 p-3 border border-gray-700 rounded-md bg-gray-800/50">
-              <h4 className="font-semibold text-sm text-gray-100">API Endpoints:</h4>
+            <div className="mt-4 space-y-2 p-4 rounded-md bg-slate-700 text-slate-100 shadow"> {/* Changed styling, consistent with other cards */}
+              <h4 className="font-semibold text-base text-slate-100 mb-2">API Endpoints:</h4> {/* Increased text size and margin */}
               {data.progressEndpoint && data.processingId && (
                 <div className="flex items-center space-x-2">
                   <Link
@@ -358,8 +397,8 @@ export const ProcessSidebar: React.FC<ProcessSidebarProps> = ({
           {showEmptyStateMessage && (
             <div className="flex flex-col items-center justify-center h-full text-center p-4">
               <InfoIcon className="h-12 w-12 text-gray-500 mb-4" />
-              <h3 className="text-lg font-semibold text-gray-200 mb-2">Sidebar Empty</h3>
-              <p className="text-sm text-gray-400">
+              <h3 className="text-lg font-semibold text-gray-100 mb-2">Sidebar Empty</h3> {/* text-gray-200 to text-gray-100 */}
+              <p className="text-sm text-gray-300"> {/* text-gray-400 to text-gray-300 */}
                 Start a process from the main page to see details and results here.
               </p>
             </div>
