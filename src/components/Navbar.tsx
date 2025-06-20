@@ -1,17 +1,35 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"; // For user avatar
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"; // For dropdown
-import { Youtube, User, FileText, DollarSign, LogOut, LogIn, UserCircle2 } from 'lucide-react'; // Added LogOut, LogIn, UserCircle2
+import { Youtube, User, FileText, DollarSign, LogOut, LogIn, UserCircle2, Chrome, Loader2 } from 'lucide-react'; // Added Chrome, Loader2
 import { useAuth } from '@/contexts/AuthContext'; // Import useAuth
 import { Link, useNavigate } from 'react-router-dom'; // Import Link and useNavigate
+import { supabase } from '@/lib/supabaseClient';
 
 const Navbar = () => {
-  const { user, signOut, isLoading } = useAuth();
+  const { user, signOut, isLoading, session } = useAuth(); // Added session for logging
   const navigate = useNavigate();
+  const [isSigningIn, setIsSigningIn] = useState(false);
 
-  const handleSignIn = () => {
-    navigate('/login'); // Navigate to the login page
+  console.log('[Navbar] Rendering. isLoading:', isLoading, 'User:', user?.id, 'Session:', session?.access_token ? 'exists' : 'null');
+
+  const handleSignIn = async () => {
+    setIsSigningIn(true);
+    // console.log('handleSignIn called'); // Remove this line
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        // Optional: Specify redirectTo if needed, though Supabase default is usually fine
+        // redirectTo: `${window.location.origin}/auth/callback`
+      },
+    });
+    if (error) {
+      setIsSigningIn(false);
+      console.error("Error logging in with Google from Navbar:", error.message);
+      // Consider showing a toast message to the user here as well
+      // toast({ title: "Sign-In Error", description: error.message, variant: "destructive" });
+    }
   };
 
   const handleSignOut = async () => {
@@ -20,7 +38,7 @@ const Navbar = () => {
   };
 
   return (
-    <nav className="w-full bg-gray-900/80 backdrop-blur-lg border-b border-gray-700/30 px-6 py-4">
+    <nav className="w-full bg-gray-900/80 border-b border-gray-700/30 px-6 py-4">
       <div className="max-w-7xl mx-auto flex items-center justify-between">
         {/* Logo */}
         <Link to="/" className="flex items-center space-x-3">
@@ -40,16 +58,19 @@ const Navbar = () => {
             <DollarSign className="w-4 h-4" />
             <span>Pricing</span>
           </a>
-          {user && ( // Only show Dashboard link if user is logged in
+          {/* {user && ( // Only show Dashboard link if user is logged in
             <Link to="/dashboard" className="flex items-center space-x-2 text-gray-300 hover:text-white transition-colors">
-              {/* Optionally add an icon e.g. <LayoutDashboard className="w-4 h-4" /> */}
+              // Optionally add an icon e.g. <LayoutDashboard className="w-4 h-4" />
               <span>Dashboard</span>
             </Link>
-          )}
+          )} */}
         </div>
 
         {/* Auth Section */}
-        <div className="flex items-center space-x-4">
+        <div
+          className="flex items-center space-x-4"
+          style={{ position: 'relative', zIndex: 50, pointerEvents: 'auto' }} // Added pointerEvents
+        >
           {isLoading ? (
             <div className="text-gray-300">Loading...</div>
           ) : user ? (
@@ -86,9 +107,20 @@ const Navbar = () => {
             <Button
               onClick={handleSignIn}
               className="bg-white text-gray-900 hover:bg-gray-100 font-medium"
+              disabled={isSigningIn}
+              style={{ pointerEvents: 'auto' }} // Corrected this line
             >
-              <LogIn className="w-4 h-4 mr-2" /> {/* Changed icon to LogIn */}
-              Sign In
+              {isSigningIn ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Signing in with Google...
+                </>
+              ) : (
+                <>
+                  <Chrome className="w-4 h-4 mr-2" />
+                  Sign in with Google
+                </>
+              )}
             </Button>
           )}
         </div>
