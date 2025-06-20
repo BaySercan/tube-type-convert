@@ -58,12 +58,12 @@ const Navbar = () => {
             <DollarSign className="w-4 h-4" />
             <span>Pricing</span>
           </a>
-          {user && ( // Only show Dashboard link if user is logged in
+          {/* {user && ( // Only show Dashboard link if user is logged in
             <Link to="/dashboard" className="flex items-center space-x-2 text-gray-300 hover:text-white transition-colors">
-              {/* Optionally add an icon e.g. <LayoutDashboard className="w-4 h-4" /> */}
+              // Optionally add an icon e.g. <LayoutDashboard className="w-4 h-4" />
               <span>Dashboard</span>
             </Link>
-          )}
+          )} */}
         </div>
 
         {/* Auth Section */}

@@ -27,8 +27,18 @@ export interface TranscriptResponse { // Added export
   post_date: string;
 }
 
+export interface AsyncJobResponse { // New type for 202 response
+  processingId: string;
+  message: string;
+  progressEndpoint: string;
+  resultEndpoint: string;
+  // Optional: include original request details if helpful
+  // originalUrl?: string;
+  // operationType?: 'transcript' | 'mp3' | 'mp4';
+}
+
 interface ProgressResponse {
-  id: string;
+  id: string; // This is the processingId
   status: string;
   progress: number;
   video_id: string;
@@ -80,7 +90,7 @@ export const getVideoTranscript = async (
   lang: string = 'tr',
   skipAI: boolean = false,
   useDeepSeek: boolean = true
-): Promise<TranscriptResponse> => {
+): Promise<TranscriptResponse | AsyncJobResponse> => { // Return type updated
   const params = new URLSearchParams({
     url: videoUrl,
     lang,
@@ -88,11 +98,21 @@ export const getVideoTranscript = async (
     useDeepSeek: String(useDeepSeek),
   });
   const response = await authenticatedFetch(`${API_BASE_URL}/transcript?${params.toString()}`);
+
+  // If response is 202 Accepted, it's an async job
+  if (response.status === 202) {
+    console.log('[videoApi] getVideoTranscript received 202, processing async job response.');
+    return response.json() as Promise<AsyncJobResponse>;
+  }
+
   if (!response.ok) {
     const errorData: ErrorResponse = await response.json().catch(() => ({ message: response.statusText }));
     throw new Error(errorData.message || `API request failed with status ${response.status}`);
   }
-  return response.json();
+
+  // Otherwise, it's a direct transcript response (e.g., from cache or quick processing)
+  console.log('[videoApi] getVideoTranscript received direct response (not 202).');
+  return response.json() as Promise<TranscriptResponse>;
 };
 
 export const getProcessingProgress = async (jobId: string): Promise<ProgressResponse> => {
@@ -121,10 +141,18 @@ export const getProcessingResult = async (jobId: string): Promise<ResultResponse
   // If the response status is 202, it means processing is not complete.
   // The API spec says it returns a specific JSON body for 202.
   // We might want to handle this differently, e.g., by returning a specific type or throwing a custom error.
+  // The API spec for /result/{jobId} says:
+  // 200 OK: returns the full result (e.g. TranscriptResponse)
+  // 202 Accepted: returns a ProgressResponse if still processing
+  // 404 Not Found: if job ID doesn't exist
   if (response.status === 202) {
-    const progressData = await response.json();
-    // You could throw a custom error or return a specific object indicating it's still processing
-    throw new Error(`Processing not complete: ${progressData.status} - ${progressData.progress}%`);
+    // It's still processing, the body will be ProgressResponse
+    // We could throw a specific error or return a type indicating it's not ready
+    const progressData = await response.json() as ProgressResponse;
+    // For the purpose of getProcessingResult, a 202 means the *final* result isn't ready.
+    // Throw an error that can be caught by the polling logic to continue polling.
+    throw new Error(`Result not yet available. Status: ${progressData.status}, Progress: ${progressData.progress}%`);
   }
-  return response.json();
+  // If it's 200 OK, it should be the final result (e.g. TranscriptResponse)
+  return response.json(); // Assuming it's TranscriptResponse or a similar structure for other job types
 };

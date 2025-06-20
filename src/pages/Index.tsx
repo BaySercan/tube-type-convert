@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { toast } from "@/hooks/use-toast";
 import { ToastAction } from "@/components/ui/toast";
-import { Youtube, Download, FileText, Info, Music, Video, Zap, Sparkles, Loader2 } from 'lucide-react';
+import { Youtube, Download, FileText, Info, Music, Video, Zap, Sparkles, Loader2, ChevronsLeft } from 'lucide-react'; // Added ChevronsLeft
 // import { useNavigate } from 'react-router-dom'; // Already imported in Dashboard, might not be needed here if not navigating from Index for these actions
 import { supabase } from '@/lib/supabaseClient';
 import Navbar from '../components/Navbar';
@@ -14,7 +14,8 @@ import Footer from '../components/Footer';
 // Imports from DashboardPage
 import { ProcessSidebar } from "@/components/ProcessSidebar";
 import * as videoApi from '@/lib/videoApi';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import type { AsyncJobResponse, TranscriptResponse } from '@/lib/videoApi'; // Import types
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'; // Added useQuery
 
 
 const Index = () => {
@@ -26,12 +27,17 @@ const Index = () => {
 
   // State for ProcessSidebar (from DashboardPage)
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [sidebarData, setSidebarData] = useState<object | null>(null);
+  const [sidebarData, setSidebarData] = useState<object | null>(null); // This will hold various data structures
   const [sidebarTitle, setSidebarTitle] = useState("Process Details");
   const [sidebarError, setErrorForSidebar] = useState<string | null>(null);
+  const [showReopenButton, setShowReopenButton] = useState(false); // For the "handsome ear"
+  const [activeBlobUrl, setActiveBlobUrl] = useState<string | null>(null); // To manage blob URL for media player
+
+  const [currentProcessingId, setCurrentProcessingId] = useState<string | null>(null);
+  // We'll use React Query's refetchInterval for polling progress
 
   // queryClient can be useful for cache invalidation or refetching, uncomment if needed
-  // const queryClient = useQueryClient();
+  const queryClient = useQueryClient();
 
 
   const outputOptions = [
@@ -52,8 +58,25 @@ const Index = () => {
     setSidebarTitle(title);
     setSidebarData(null); // Clear previous data
     setErrorForSidebar(null); // Clear previous error
+    setShowReopenButton(false); // Hide reopen button when sidebar opens for a new action
     setIsSidebarOpen(true);
     console.log('[IndexPage] setIsSidebarOpen(true) - state should be updated.');
+  };
+
+  const handleSidebarOpenChange = (isOpen: boolean) => {
+    setIsSidebarOpen(isOpen);
+    if (!isOpen) {
+      if (sidebarData || sidebarError) {
+        setShowReopenButton(true); // Show button if sidebar is closed and has content
+      }
+      if (activeBlobUrl) {
+        console.log('[IndexPage] Sidebar closed, revoking active blob URL:', activeBlobUrl);
+        URL.revokeObjectURL(activeBlobUrl);
+        setActiveBlobUrl(null);
+      }
+    } else { // Sidebar is opening
+      setShowReopenButton(false); // Hide button if sidebar is open
+    }
   };
 
   // --- React Query Mutations (from DashboardPage) ---
@@ -100,16 +123,29 @@ const Index = () => {
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      URL.revokeObjectURL(link.href);
+      // URL.revokeObjectURL(link.href); // Don't revoke immediately, keep for player
 
-      setSidebarTitle(`${variables.format.toUpperCase()} Download Started`);
+      // Revoke previous blob URL if one exists
+      if (activeBlobUrl) {
+        URL.revokeObjectURL(activeBlobUrl);
+        console.log('[IndexPage] Revoked previous active blob URL:', activeBlobUrl);
+      }
+      setActiveBlobUrl(link.href); // Store the new blob URL
+
+      setSidebarTitle(`${variables.format.toUpperCase()} Ready`);
       setSidebarData({
-        message: `${variables.format.toUpperCase()} download should begin shortly. Check your browser downloads.`,
+        message: `${variables.format.toUpperCase()} is ready. Download has started. You can also play it here.`,
         fileName,
+        mediaUrl: link.href, // Pass the blob URL to the sidebar
+        mediaType: variables.format === 'mp3' ? 'audio/mpeg' : 'video/mp4',
       });
       setErrorForSidebar(null);
     },
     onError: (error, variables) => {
+      if (activeBlobUrl) { // Clean up blob URL on error too
+        URL.revokeObjectURL(activeBlobUrl);
+        setActiveBlobUrl(null);
+      }
       console.error(`[IndexPage] Download ${variables.format.toUpperCase()} Mutation onError:`, error);
       setSidebarTitle(`Error Downloading ${variables.format.toUpperCase()}`);
       setErrorForSidebar(error.message || "An unknown error occurred.");
@@ -117,20 +153,42 @@ const Index = () => {
     },
   });
 
-  const transcriptMutation = useMutation<videoApi.TranscriptResponse, Error, string>({
+  // Type guard to check if response is AsyncJobResponse
+  function isAsyncJobResponse(response: any): response is AsyncJobResponse {
+    return response && typeof response.processingId === 'string';
+  }
+
+  const transcriptMutation = useMutation<TranscriptResponse | AsyncJobResponse, Error, string>({
     mutationFn: (videoUrl: string) => {
       console.log('[IndexPage] transcriptMutation.mutationFn called with url:', videoUrl);
-      return videoApi.getVideoTranscript(videoUrl); // Default lang, skipAI, useDeepSeek
+      return videoApi.getVideoTranscript(videoUrl);
     },
     onSuccess: (data) => {
       console.log('[IndexPage] Transcript Mutation onSuccess:', data);
-      setSidebarTitle("Video Transcript");
-      setSidebarData(data);
       setErrorForSidebar(null);
-      // TODO: Check if data indicates a job ID for polling, if so, initiate polling.
+      setCurrentProcessingId(null); // Clear any previous processing ID
+
+      if (isAsyncJobResponse(data)) {
+        setSidebarTitle("Transcript Processing Started");
+        setSidebarData({ // Store the async job details
+          message: data.message,
+          processingId: data.processingId,
+          progressEndpoint: data.progressEndpoint,
+          resultEndpoint: data.resultEndpoint,
+          status: "processing_initiated", // Custom status
+        });
+        setCurrentProcessingId(data.processingId); // Start polling for this ID
+        console.log(`[IndexPage] Transcript is async. Processing ID: ${data.processingId}`);
+      } else {
+        // Direct response (TranscriptResponse)
+        setSidebarTitle("Video Transcript");
+        setSidebarData(data); // This is the final transcript
+        console.log('[IndexPage] Transcript received directly.');
+      }
     },
     onError: (error) => {
       console.error('[IndexPage] Transcript Mutation onError:', error);
+      setCurrentProcessingId(null); // Stop polling on error
       setSidebarTitle("Error Fetching Transcript");
       setErrorForSidebar(error.message || "An unknown error occurred.");
       setSidebarData(null);
@@ -138,10 +196,129 @@ const Index = () => {
   });
 
   // Composite loading state for disabling form elements / showing processing
-  const isProcessing = infoMutation.isPending || downloadFileMutation.isPending || transcriptMutation.isPending;
-  const isSidebarLoading = isProcessing; // Sidebar loading is the same as overall processing for now
+  // isProcessing should be true if any mutation is pending OR if we are actively polling.
+  const isAnyMutationPending = infoMutation.isPending || downloadFileMutation.isPending || transcriptMutation.isPending;
+  const isPollingActive = !!currentProcessingId;
+
+  const isProcessing = isAnyMutationPending || isPollingActive;
+  // Sidebar loading should be true if a mutation is pending, or if polling is active and we don't have final data yet.
+  // The 'sidebarData' might already show "processing..." from the AsyncJobResponse,
+  // so isSidebarLoading might primarily reflect the initial mutation call.
+  // Let's refine this: sidebar should show its own loading state based on what it's displaying.
+  // ProcessSidebar already has an isLoading prop. We need to pass it correctly.
+  // If currentProcessingId is set, and we don't have a final result, it's loading.
+  // If a mutation is pending, it's loading.
+
+  const { data: progressData, error: progressError, isLoading: isProgressLoading, refetch: refetchProgress } = useQuery({
+    queryKey: ['progress', currentProcessingId],
+    queryFn: async () => {
+      if (!currentProcessingId) return null;
+      console.log(`[IndexPage] Polling progress for ${currentProcessingId}`);
+      try {
+        const progress = await videoApi.getProcessingProgress(currentProcessingId);
+        setSidebarData(prevData => ({
+          ...(typeof prevData === 'object' ? prevData : {}), // Preserve existing sidebar data (like endpoints)
+          status: progress.status,
+          progress: progress.progress,
+          video_title: progress.video_title, // Add video title if available
+          lastUpdated: new Date().toLocaleTimeString(),
+          message: `Status: ${progress.status}, Progress: ${progress.progress}%`,
+        }));
+        setErrorForSidebar(null);
+
+        if (progress.status === 'completed' || progress.status === 'failed' || progress.progress === 100) {
+          console.log(`[IndexPage] Progress complete or failed for ${currentProcessingId}. Status: ${progress.status}`);
+          setCurrentProcessingId(null); // Stop polling progress
+          queryClient.invalidateQueries({ queryKey: ['progress', currentProcessingId] }); // Stop this query
+
+          if (progress.status === 'completed' || progress.progress === 100) {
+            // Fetch final result
+            setSidebarTitle("Fetching Final Result...");
+            // Consider using a mutation for fetching result for better loading/error states
+            videoApi.getProcessingResult(progress.id)
+              .then(result => {
+                setSidebarTitle("Transcript Result");
+                setSidebarData(result); // This should be the TranscriptResponse
+                setErrorForSidebar(null);
+              })
+              .catch(err => {
+                console.error(`[IndexPage] Error fetching result for ${progress.id}:`, err);
+                setSidebarTitle("Error Fetching Result");
+                setErrorForSidebar(err.message || "Failed to get final result.");
+                setSidebarData(prevData => ({
+                    ...(typeof prevData === 'object' ? prevData : {}),
+                    status: "result_error",
+                }));
+              });
+          } else { // Failed status
+             setSidebarTitle("Processing Failed");
+             setErrorForSidebar(`Processing failed with status: ${progress.status}`);
+             setSidebarData(prevData => ({
+                ...(typeof prevData === 'object' ? prevData : {}),
+                status: "processing_failed",
+                message: `Error: Processing failed. Status: ${progress.status}`,
+             }));
+          }
+        }
+        return progress;
+      } catch (err: any) {
+        console.error(`[IndexPage] Error polling progress for ${currentProcessingId}:`, err);
+        setErrorForSidebar(err.message || "Error fetching progress.");
+        // Optionally stop polling on certain errors
+        // setCurrentProcessingId(null);
+        // queryClient.invalidateQueries({ queryKey: ['progress', currentProcessingId] });
+        throw err; // Re-throw to let React Query handle it
+      }
+    },
+    enabled: !!currentProcessingId, // Only run query if currentProcessingId is set
+    refetchInterval: (query) => { // Custom refetch interval logic
+      if (!currentProcessingId) return false; // Stop polling if no ID
+      const data = query.state.data as videoApi.ProgressResponse | null;
+      if (data && (data.status === 'completed' || data.status === 'failed' || data.progress === 100)) {
+        return false; // Stop polling if complete, failed, or 100%
+      }
+      return 5000; // Poll every 5 seconds
+    },
+    refetchIntervalInBackground: true,
+    refetchOnWindowFocus: false, // Avoid refetching just on window focus if polling
+  });
+
+  useEffect(() => {
+    if (progressError) {
+      console.error("[IndexPage] Progress polling error:", progressError);
+      // setErrorForSidebar(progressError.message || "Error fetching progress.");
+      // Decide if we should stop polling on error. For now, React Query will retry.
+    }
+  }, [progressError]);
+
+  // Effect to cleanup blob URL on component unmount or when currentProcessingId changes (new process)
+  useEffect(() => {
+    return () => {
+      if (activeBlobUrl) {
+        console.log('[IndexPage] Unmounting or new process, revoking active blob URL:', activeBlobUrl);
+        URL.revokeObjectURL(activeBlobUrl);
+        setActiveBlobUrl(null);
+      }
+    };
+  }, []); // Empty dependency array means this runs on mount and cleans up on unmount
+
+  const isSidebarLoading = isAnyMutationPending || (isPollingActive && isProgressLoading) || (isPollingActive && !sidebarData);
+
 
   const handleProcess = () => {
+    // Clear previous polling state if a new process is started
+    setCurrentProcessingId(null);
+    queryClient.removeQueries({ queryKey: ['progress'] }); // Clear old progress queries
+
+    // Revoke any existing blob URL when a new process starts
+    if (activeBlobUrl) {
+      console.log('[IndexPage] New process started, revoking active blob URL:', activeBlobUrl);
+      URL.revokeObjectURL(activeBlobUrl);
+      setActiveBlobUrl(null);
+    }
+
+    if (!user) {
+      const { update: updateToast } = toast({
     if (!user) {
       const { update: updateToast } = toast({
         id: 'auth-toast',
@@ -333,33 +510,43 @@ const Index = () => {
                   ) : (
                     <>
                       <Zap className="w-7 h-7" />
-                      <span>Start Conversion</span>
+                      <span>Process Request</span>
                       <Zap className="w-7 h-7" />
                     </>
                   )}
                 </div>
               </Button>
+              {isProcessing && (
+                <p className="text-yellow-400 text-xs text-center mt-3 animate-pulse">
+                  A process is currently ongoing. Please wait for it to complete before starting a new one.
+                </p>
+              )}
             </div>
-
-            {/* Status indicator - can be removed if sidebar provides enough feedback */}
-            {/* {isProcessing && (
-              <div className="flex items-center justify-center space-x-3 p-4 bg-gray-800/30 rounded-lg border border-gray-700/30">
-                <div className="w-6 h-6 border-2 border-gray-600/40 border-t-gray-300 rounded-full animate-spin"></div>
-                <span className="text-gray-200">Processing your request...</span>
-              </div>
-            )} */}
           </div>
         </Card>
       </div>
 
       <ProcessSidebar
         isOpen={isSidebarOpen}
-        onOpenChange={setIsSidebarOpen}
+        onOpenChange={handleSidebarOpenChange} // Use the new handler
         title={sidebarTitle}
-        data={sidebarData}
-        isLoading={isSidebarLoading} // Use the composite loading state
+        data={sidebarData} // sidebarData will now contain progress info too
+        isLoading={isSidebarLoading}
         error={sidebarError}
       />
+
+      {showReopenButton && (
+        <Button
+          onClick={() => {
+            setIsSidebarOpen(true);
+            setShowReopenButton(false); // Hide button once sidebar is reopened
+          }}
+          className="fixed top-1/2 right-0 -translate-y-1/2 z-50 bg-gray-700 hover:bg-gray-600 text-white p-3 rounded-l-md shadow-lg"
+          title="Reopen Sidebar"
+        >
+          <ChevronsLeft className="h-6 w-6" />
+        </Button>
+      )}
 
       <Footer />
     </div>
