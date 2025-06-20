@@ -317,51 +317,8 @@ const Index = () => {
       setActiveBlobUrl(null);
     }
 
-    if (!user) {
-      const { update: updateToast } = toast({
-    if (!user) {
-      const { update: updateToast } = toast({
-        id: 'auth-toast',
-        title: "Authentication Required",
-        description: "Please sign in to start a video conversion.",
-        variant: "destructive",
-        action: (
-          <ToastAction
-            altText="Sign in with Google"
-            onClick={async () => {
-              updateToast({
-                id: 'auth-toast',
-                title: "Signing in with Google...",
-                description: (
-                  <div style={{ display: 'flex', alignItems: 'center' }}>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Please wait...
-                  </div>
-                ),
-                action: null,
-                open: true,
-                variant: "default",
-              });
-              const { error } = await supabase.auth.signInWithOAuth({ provider: 'google' });
-              if (error) {
-                console.error("Error logging in with Google from toast:", error.message);
-                updateToast({
-                  id: 'auth-toast',
-                  title: "Sign-In Error",
-                  description: error.message,
-                  action: null,
-                  open: true,
-                  variant: "destructive",
-                });
-              }
-            }}
-          >
-            Sign in with Google
-          </ToastAction>
-        ),
-      });
-      return;
-    }
+    // The duplicated if (!user) block was removed from here.
+    // The first if (!user) block starting around line 313 is the correct one.
 
     if (!url.trim()) {
       toast({ title: "URL Required", description: "Please enter a YouTube URL", variant: "destructive" });

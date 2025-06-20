@@ -37,7 +37,7 @@ export interface AsyncJobResponse { // New type for 202 response
   // operationType?: 'transcript' | 'mp3' | 'mp4';
 }
 
-interface ProgressResponse {
+export interface ProgressResponse { // Added export
   id: string; // This is the processingId
   status: string;
   progress: number;
