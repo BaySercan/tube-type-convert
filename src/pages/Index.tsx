@@ -30,7 +30,7 @@ const Index = () => {
   const [sidebarData, setSidebarData] = useState<object | null>(null); // This will hold various data structures
   const [sidebarTitle, setSidebarTitle] = useState("Process Details");
   const [sidebarError, setErrorForSidebar] = useState<string | null>(null);
-  const [showReopenButton, setShowReopenButton] = useState(false); // For the "handsome ear"
+  const [showReopenButton, setShowReopenButton] = useState(true); // Initialize to true, as sidebar is initially closed
   const [activeBlobUrl, setActiveBlobUrl] = useState<string | null>(null); // To manage blob URL for media player
 
   const [currentProcessingId, setCurrentProcessingId] = useState<string | null>(null);
@@ -58,26 +58,27 @@ const Index = () => {
     setSidebarTitle(title);
     setSidebarData(null); // Clear previous data
     setErrorForSidebar(null); // Clear previous error
-    setShowReopenButton(false); // Hide reopen button when sidebar opens for a new action
+    // setShowReopenButton(false); // No longer needed here, managed by useEffect
     setIsSidebarOpen(true);
     console.log('[IndexPage] setIsSidebarOpen(true) - state should be updated.');
   };
 
   const handleSidebarOpenChange = (isOpen: boolean) => {
     setIsSidebarOpen(isOpen);
-    if (!isOpen) { // When sidebar is closing
-      if (sidebarData || sidebarError || activeBlobUrl) { // Also show if there's an active blob URL
-        setShowReopenButton(true);
-      }
-      if (activeBlobUrl) {
-        console.log('[IndexPage] Sidebar closed, revoking active blob URL:', activeBlobUrl);
-        URL.revokeObjectURL(activeBlobUrl);
-        setActiveBlobUrl(null);
-      }
-    } else { // Sidebar is opening
-      setShowReopenButton(false); // Hide button if sidebar is open
+    // setShowReopenButton(!isOpen); // Simplified logic, but useEffect is better for direct state->state updates
+
+    // Still need to handle activeBlobUrl revocation when sidebar closes
+    if (!isOpen && activeBlobUrl) {
+      console.log('[IndexPage] Sidebar closed, revoking active blob URL:', activeBlobUrl);
+      URL.revokeObjectURL(activeBlobUrl);
+      setActiveBlobUrl(null);
     }
   };
+
+  // Effect to manage the reopen button visibility based on sidebar state
+  useEffect(() => {
+    setShowReopenButton(!isSidebarOpen);
+  }, [isSidebarOpen]);
 
   // --- React Query Mutations (from DashboardPage) ---
 
@@ -176,13 +177,14 @@ const Index = () => {
           progressEndpoint: data.progressEndpoint,
           resultEndpoint: data.resultEndpoint,
           status: "processing_initiated", // Custom status
+          originalUrl: url, // Add originalUrl for transcript requests
         });
         setCurrentProcessingId(data.processingId); // Start polling for this ID
         console.log(`[IndexPage] Transcript is async. Processing ID: ${data.processingId}`);
       } else {
         // Direct response (TranscriptResponse)
         setSidebarTitle("Video Transcript");
-        setSidebarData(data); // This is the final transcript
+        setSidebarData({...data, originalUrl: url }); // Add originalUrl here too
         console.log('[IndexPage] Transcript received directly.');
       }
     },
@@ -223,6 +225,7 @@ const Index = () => {
           video_title: progress.video_title, // Add video title if available
           lastUpdated: new Date().toLocaleTimeString(),
           message: `Status: ${progress.status}, Progress: ${progress.progress}%`,
+          originalUrl: (prevData as any)?.originalUrl || url, // Preserve or add originalUrl
         }));
         setErrorForSidebar(null);
 
@@ -496,12 +499,12 @@ const Index = () => {
         <Button
           onClick={() => {
             setIsSidebarOpen(true);
-            setShowReopenButton(false); // Hide button once sidebar is reopened
+            // setShowReopenButton(false); // Logic changed: button visibility now tied to isSidebarOpen state directly via useEffect
           }}
-          className="fixed top-1/2 right-0 -translate-y-1/2 z-50 bg-slate-600 hover:bg-slate-500 text-white p-4 rounded-l-lg shadow-xl animate-pulse border-2 border-slate-400" // Increased padding, new bg, larger rounded corners, shadow, pulse, border
+          className="fixed top-1/2 right-0 -translate-y-1/2 z-50 bg-slate-600 hover:bg-slate-500 text-white p-4 rounded-l-lg shadow-xl animate-pulse border-2 border-slate-400 h-32" // Added h-32 for increased height
           title="Reopen Sidebar"
         >
-          <ChevronsLeft className="h-8 w-8" /> {/* Increased icon size */}
+          <ChevronsLeft className="h-10 w-10" /> {/* Increased icon size further */}
         </Button>
       )}
 

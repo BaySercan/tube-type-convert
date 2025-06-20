@@ -9,9 +9,10 @@ import {
 } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Copy, ExternalLink, InfoIcon, AlertTriangleIcon, Download, Loader2 } from "lucide-react"; // Added Download icon and Loader2
+import { Copy, ExternalLink, InfoIcon, AlertTriangleIcon, Download, Loader2 } from "lucide-react";
 import ReactJson from 'react-json-view';
-import { Progress } from "@/components/ui/progress"; // For displaying progress bar
+import { Progress } from "@/components/ui/progress";
+import { Link } from "react-router-dom"; // Import Link
 import React, { useState, useEffect } from 'react'; // Added useState and useEffect
 
 // Define a more specific type for the data prop
@@ -22,6 +23,7 @@ interface SidebarData {
   message?: string;       // Initial message or progress message
   progressEndpoint?: string;
   resultEndpoint?: string;
+  originalUrl?: string; // Added for passing to progress/result pages
 
   // Properties from ProgressResponse (polling)
   status?: string;        // e.g., "processing", "completed", "failed"
@@ -162,6 +164,13 @@ export const ProcessSidebar: React.FC<ProcessSidebarProps> = ({
   ) : {};
   const hasJsonDataForViewer = Object.keys(jsonDataForViewer).length > 0;
 
+  // Determine if the sidebar is opened without any specific content to show initially
+  // This happens if isOpen, but no data, no error, and not in a loading state that would soon populate data.
+  // The `isLoading` prop passed from Index.tsx reflects mutations pending or polling active.
+  // If `isLoading` is true, we expect content or an error soon.
+  // If `isLoading` is false, and there's no data/error, then it's truly "empty" on open.
+  const showEmptyStateMessage = isOpen && !data && !error && !isLoading;
+
 
   return (
     <Sheet open={isOpen} onOpenChange={onOpenChange}>
@@ -169,20 +178,16 @@ export const ProcessSidebar: React.FC<ProcessSidebarProps> = ({
         <SheetHeader>
           <SheetTitle>{title}</SheetTitle>
           <SheetDescription>
-            {isLoading && !data?.progress ? (
-              <div className="flex items-center space-x-2 text-sm text-gray-300">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                <span>{currentLoadingMessage}</span>
-              </div>
-            ) : (error ? "An error occurred." : "View the process details below.")}
+            {error ? "An error occurred." : "View the process details below."} {/* Removed top loading indicator */}
+            {/* The funny loading message and spinner are now only in the main content area */}
             {data?.lastUpdated && <span className="text-xs block text-gray-400">Last updated: {data.lastUpdated}</span>}
           </SheetDescription>
         </SheetHeader>
 
         {/* Warning Message */}
-        <div className="p-3 mx-1 mt-2 border border-yellow-500 bg-yellow-900/30 rounded-md text-yellow-200 text-xs"> {/* Changed text-yellow-300 to text-yellow-200 */}
+        <div className="p-3 mx-1 mt-2 border border-yellow-500 bg-yellow-900/40 rounded-md text-yellow-100 text-xs"> {/* Changed text-yellow-200 to text-yellow-100 and increased bg opacity */}
           <div className="flex items-center space-x-2">
-            <AlertTriangleIcon className="h-5 w-5 text-yellow-400 flex-shrink-0" />
+            <AlertTriangleIcon className="h-5 w-5 text-yellow-300 flex-shrink-0" /> {/* Adjusted icon color slightly for better harmony */}
             <p>
               <strong>Important:</strong> Results displayed here are temporary. Please save your data (copy JSON, download files) as it will be lost when you close this panel or start a new process.
             </p>
@@ -210,8 +215,8 @@ export const ProcessSidebar: React.FC<ProcessSidebarProps> = ({
           {isLoading && !data?.progress && ( // Show general loading spinner if no progress yet
             <div className="flex flex-col items-center justify-center h-full space-y-3 text-center">
               <Loader2 className="h-10 w-10 animate-spin text-blue-400" />
-              <p className="text-lg font-medium text-gray-200">{currentLoadingMessage}</p>
-              <p className="text-sm text-gray-400">Please wait a moment...</p>
+              <p className="text-lg font-medium text-gray-100">{currentLoadingMessage}</p> {/* Changed text-gray-200 to text-gray-100 */}
+              {/* Removed: <p className="text-sm text-gray-400">Please wait a moment...</p> */}
             </div>
           )}
 
@@ -227,18 +232,18 @@ export const ProcessSidebar: React.FC<ProcessSidebarProps> = ({
 
           {/* Display for initial Async Job Response (202) */}
           {isAsyncJobInitial && data?.message && (
-            <div className="p-3 border border-blue-600 bg-blue-900/20 rounded-md">
-              <div className="flex items-center space-x-2">
-                <InfoIcon className="h-5 w-5 text-blue-400" />
+            <div className="p-4 rounded-md bg-slate-700 text-slate-100 shadow"> {/* New styling */}
+              <div className="flex items-center space-x-2 mb-2">
+                <InfoIcon className="h-5 w-5 text-blue-300 flex-shrink-0" /> {/* Adjusted icon color */}
                 <p className="font-semibold">Processing Started</p>
               </div>
-              <p className="text-sm mt-1">{data.message}</p>
+              <p className="text-sm">{data.message}</p>
             </div>
           )}
 
           {/* Media Player Section */}
           {data?.mediaUrl && data.mediaType && (
-            <div className="p-4 bg-slate-800/60 border border-slate-700 rounded-lg space-y-4 shadow-md"> {/* Enhanced container styling */}
+            <div className="p-4 bg-zinc-800 border border-slate-700 rounded-lg space-y-4 shadow-md"> {/* Changed bg-slate-800/60 to bg-zinc-800 */}
               <h4 className="font-semibold text-base text-gray-100">Media Preview:</h4> {/* Increased text size */}
               {data.mediaType.startsWith('audio/') && (
                 <audio controls src={data.mediaUrl} className="w-full border border-slate-600 rounded-md"> {/* Added border to audio player */}
@@ -275,13 +280,13 @@ export const ProcessSidebar: React.FC<ProcessSidebarProps> = ({
 
           {/* Display for Polling Progress */}
           {isPollingProgress && data && (
-            <div className="space-y-2 p-3 border border-gray-700 rounded-md">
-              {data.video_title && <p className="text-sm font-medium text-gray-100">Video: {data.video_title}</p>} {/* Added text-gray-100 for better contrast */}
-              <p className="text-sm text-gray-200">Status: <span className="font-semibold text-gray-100">{data.status}</span></p> {/* Added text-gray-200/100 for better contrast */}
+            <div className="space-y-3 p-4 rounded-md bg-slate-700 text-slate-100 shadow"> {/* New styling, increased space-y */}
+              {data.video_title && <p className="text-sm font-medium">Video: <span className="font-normal text-slate-300">{data.video_title}</span></p>}
+              <p className="text-sm font-medium">Status: <span className="font-semibold text-amber-400">{data.status}</span></p> {/* Status color changed */}
               {typeof data.progress === 'number' && (
                 <>
                   <Progress value={data.progress} className="w-full h-5" /> {/* Increased height from h-3 to h-5 */}
-                  <p className="text-sm text-right text-gray-300">{data.progress}% complete</p> {/* Added text-gray-300 for better contrast */}
+                  <p className="text-sm text-right text-slate-300">{data.progress}% complete</p>
                 </>
               )}
             </div>
@@ -323,34 +328,47 @@ export const ProcessSidebar: React.FC<ProcessSidebarProps> = ({
           {data && (data.progressEndpoint || data.resultEndpoint) && (
             <div className="mt-4 space-y-2 p-3 border border-gray-700 rounded-md bg-gray-800/50">
               <h4 className="font-semibold text-sm text-gray-100">API Endpoints:</h4>
-              {data.progressEndpoint && (
+              {data.progressEndpoint && data.processingId && (
                 <div className="flex items-center space-x-2">
-                  <Button
-                    variant="link"
-                    className="p-0 h-auto text-blue-400 hover:text-blue-300 text-xs"
-                    onClick={() => window.open(data.progressEndpoint, '_blank')}
+                  <Link
+                    to={`/progress/${data.processingId}`}
+                    state={{ videoUrl: data.originalUrl, videoTitle: data.video_title }} // Pass relevant data
+                    target="_blank"
+                    className="p-0 h-auto text-blue-400 hover:text-blue-300 text-xs inline-flex items-center hover:underline"
                   >
-                    View Progress Endpoint <ExternalLink className="inline-block ml-1 h-3 w-3" />
-                  </Button>
+                    View Progress Page <ExternalLink className="inline-block ml-1 h-3 w-3" />
+                  </Link>
                 </div>
               )}
-              {data.resultEndpoint && (
+              {data.resultEndpoint && data.processingId && (
                 <div className="flex items-center space-x-2">
-                  <Button
-                    variant="link"
-                    className="p-0 h-auto text-blue-400 hover:text-blue-300 text-xs"
-                    onClick={() => window.open(data.resultEndpoint, '_blank')}
+                  <Link
+                    to={`/result/${data.processingId}`}
+                    state={{ videoUrl: data.originalUrl, videoTitle: data.video_title }} // Pass relevant data
+                    target="_blank"
+                    className="p-0 h-auto text-blue-400 hover:text-blue-300 text-xs inline-flex items-center hover:underline"
                   >
-                    View Result Endpoint <ExternalLink className="inline-block ml-1 h-3 w-3" />
-                  </Button>
+                    View Result Page <ExternalLink className="inline-block ml-1 h-3 w-3" />
+                  </Link>
                 </div>
               )}
             </div>
           )}
 
-          {!isLoading && !error && !data && (
+          {showEmptyStateMessage && (
+            <div className="flex flex-col items-center justify-center h-full text-center p-4">
+              <InfoIcon className="h-12 w-12 text-gray-500 mb-4" />
+              <h3 className="text-lg font-semibold text-gray-200 mb-2">Sidebar Empty</h3>
+              <p className="text-sm text-gray-400">
+                Start a process from the main page to see details and results here.
+              </p>
+            </div>
+          )}
+
+          {/* Fallback for "No data to display yet" if it's not loading, no error, but also not the initial empty state (e.g. data was cleared) */}
+          {!isLoading && !error && !data && !showEmptyStateMessage && (
              <div className="flex items-center justify-center h-full">
-              <p className="text-gray-400">No data to display yet.</p> {/* This could also be brightened if needed, e.g. text-gray-300 */}
+              <p className="text-gray-400">No data to display yet.</p>
             </div>
           )}
         </ScrollArea>
