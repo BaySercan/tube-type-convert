@@ -192,7 +192,7 @@ export const ProcessSidebar: React.FC<ProcessSidebarProps> = ({
         </SheetHeader>
 
         {/* Warning Message */}
-        <div className="p-3 mx-1 mt-2 border border-red-600 bg-red-800/80 rounded-md text-red-100 text-xs"> {/* Changed to red theme for higher alert */}
+        <div className="p-3 mb-4 w-full border border-red-600 bg-red-800/80 rounded-md text-red-100 text-xs"> {/* Changed to red theme for higher alert, adjusted margins/width */}
           <div className="flex items-center space-x-2">
             <AlertTriangleIcon className="h-5 w-5 text-red-300 flex-shrink-0" /> {/* Icon to match red theme */}
             <p>
@@ -201,10 +201,10 @@ export const ProcessSidebar: React.FC<ProcessSidebarProps> = ({
           </div>
         </div>
 
-        <ScrollArea className="flex-grow my-2 pr-6 space-y-4">
+        <ScrollArea className="flex-grow pr-6 space-y-4"> {/* Removed my-2 */}
           {/* AI Transcript Warning */}
           {isTranscriptRequest && (isPollingProgress || (isLoading && !data?.progress && !error)) && (
-            <div className="p-3 my-2 border border-sky-600 bg-sky-700/60 rounded-md text-sky-100 text-xs shadow"> {/* Changed to sky theme */}
+            <div className="p-3 border border-sky-600 bg-sky-700/60 rounded-md text-sky-100 text-xs shadow w-full"> {/* Changed to sky theme, removed my-2, added w-full */}
               <div className="flex items-center space-x-2">
                 <InfoIcon className="h-5 w-5 text-sky-300 flex-shrink-0" /> {/* Icon to match sky theme */}
                 <p>
@@ -214,26 +214,9 @@ export const ProcessSidebar: React.FC<ProcessSidebarProps> = ({
             </div>
           )}
 
-          {/* Display Original URL for Transcript Requests */}
-          {isTranscriptRequest && data?.originalUrl && (isPollingProgress || (isLoading && !data?.progress && !error)) && (
-            <div className="p-3 my-2 border border-slate-600 bg-slate-700/50 rounded-md text-slate-200 text-sm shadow">
-              <p>
-                AI transcript requested for: <br />
-                <a
-                  href={data.originalUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-blue-400 hover:text-blue-300 hover:underline break-all inline-flex items-center"
-                >
-                  {data.originalUrl} <ExternalLink className="inline-block ml-1.5 h-4 w-4 flex-shrink-0" />
-                </a>
-              </p>
-            </div>
-          )}
-
           {/* Timer Display - Placed outside the AI warning, but still conditional on transcript request & timer having started */}
           {isTranscriptRequest && timerStartTime !== null && (
-            <div className="my-3 p-3 bg-slate-700 rounded-md text-center shadow">
+            <div className="p-3 bg-slate-700 rounded-md text-center shadow w-full"> {/* Removed my-3, added w-full */}
               <p className="text-xs text-slate-300 mb-1">Elapsed Time</p>
               <p className="text-2xl font-mono text-cyan-400 tracking-wider">
                 {formatTime(elapsedTime)}
@@ -242,15 +225,15 @@ export const ProcessSidebar: React.FC<ProcessSidebarProps> = ({
           )}
 
           {isLoading && !data?.progress && ( // Show general loading spinner if no progress yet
-            <div className="flex flex-col items-center justify-center h-full space-y-3 text-center">
+            <div className="flex flex-col items-center justify-center h-full space-y-3 text-center w-full"> {/* Added w-full (though flex might handle it) */}
               <Loader2 className="h-10 w-10 animate-spin text-blue-400" />
-              <p className="text-lg font-medium text-white">{currentLoadingMessage}</p> {/* Changed text-gray-100 to text-white */}
+              <p className="text-lg font-medium text-slate-300">{currentLoadingMessage}</p> {/* Changed text-white to text-slate-300 for better contrast as requested */}
               {/* Removed: <p className="text-sm text-gray-400">Please wait a moment...</p> */}
             </div>
           )}
 
           {error && (
-            <div className="text-red-500 p-3 border border-red-600 bg-red-900/20 rounded-md">
+            <div className="text-red-500 p-3 border border-red-600 bg-red-900/20 rounded-md w-full"> {/* Added w-full */}
               <div className="flex items-center space-x-2">
                 <AlertTriangleIcon className="h-5 w-5 text-red-500" />
                 <p className="font-semibold">Error:</p>
@@ -261,7 +244,7 @@ export const ProcessSidebar: React.FC<ProcessSidebarProps> = ({
 
           {/* Display for initial Async Job Response (202) */}
           {isAsyncJobInitial && data?.message && (
-            <div className="p-4 rounded-md bg-slate-700 text-slate-100 shadow"> {/* New styling */}
+            <div className="p-4 rounded-md bg-slate-700 text-slate-100 shadow w-full"> {/* New styling, added w-full */}
               <div className="flex items-center space-x-2 mb-2">
                 <InfoIcon className="h-5 w-5 text-blue-300 flex-shrink-0" /> {/* Adjusted icon color */}
                 <p className="font-semibold">Processing Started</p>
@@ -272,7 +255,7 @@ export const ProcessSidebar: React.FC<ProcessSidebarProps> = ({
 
           {/* Media Player Section */}
           {data?.mediaUrl && data.mediaType && (
-            <div className="p-4 bg-zinc-800 border border-slate-700 rounded-lg space-y-4 shadow-md"> {/* Changed bg-slate-800/60 to bg-zinc-800 */}
+            <div className="p-4 bg-zinc-800 border border-slate-700 rounded-lg space-y-4 shadow-md w-full"> {/* Changed bg-slate-800/60 to bg-zinc-800, added w-full */}
               <h4 className="font-semibold text-base text-gray-100">Media Preview:</h4> {/* Increased text size */}
               {data.mediaType.startsWith('audio/') && (
                 <audio controls src={data.mediaUrl} className="w-full border border-slate-600 rounded-md"> {/* Added border to audio player */}
@@ -309,7 +292,7 @@ export const ProcessSidebar: React.FC<ProcessSidebarProps> = ({
 
           {/* Display for Polling Progress */}
           {isPollingProgress && data && (
-            <div className="space-y-3 p-4 rounded-md bg-slate-700 text-slate-100 shadow"> {/* New styling, increased space-y */}
+            <div className="space-y-3 p-4 rounded-md bg-slate-700 text-slate-100 shadow w-full"> {/* New styling, increased space-y, added w-full */}
               {data.video_title && <p className="text-sm font-medium">Video: <span className="font-normal text-slate-300">{data.video_title}</span></p>}
               <p className="text-sm font-medium">Status: <span className="font-semibold text-amber-400">{data.status}</span></p> {/* Status color changed */}
               {typeof data.progress === 'number' && (
@@ -324,7 +307,7 @@ export const ProcessSidebar: React.FC<ProcessSidebarProps> = ({
           {/* Display JSON data using ReactJson viewer */}
           {/* This will show the final result, or the initial 202 object if not handled above */}
           {data && !error && hasJsonDataForViewer && (
-             <div className="bg-gray-800 text-white p-3 rounded-md relative group border border-gray-700">
+             <div className="bg-gray-800 text-white p-3 rounded-md relative group border border-gray-700 w-full"> {/* Added w-full */}
               <div className="flex justify-between items-center mb-2">
                 <span className="text-xs font-semibold text-gray-200"> {/* Changed text-gray-400 to text-gray-200 */}
                   {isFinalData ? "Final Result JSON" : "Response Data"}
@@ -365,7 +348,7 @@ export const ProcessSidebar: React.FC<ProcessSidebarProps> = ({
 
           {/* Display Endpoints if available (from initial 202 or progress) - MOVED TO BOTTOM */}
           {data && (data.progressEndpoint || data.resultEndpoint) && (
-            <div className="mt-4 space-y-2 p-4 rounded-md bg-slate-700 text-slate-100 shadow"> {/* Changed styling, consistent with other cards */}
+            <div className="space-y-2 p-4 rounded-md bg-slate-700 text-slate-100 shadow w-full"> {/* Changed styling, consistent with other cards, removed mt-4, added w-full */}
               <h4 className="font-semibold text-base text-slate-100 mb-2">API Endpoints:</h4> {/* Increased text size and margin */}
               {data.progressEndpoint && data.processingId && (
                 <div className="flex items-center space-x-2">
