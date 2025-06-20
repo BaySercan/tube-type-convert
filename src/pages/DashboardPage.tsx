@@ -61,31 +61,41 @@ const DashboardPage = () => {
   // --- React Query Mutations ---
 
   const infoMutation = useMutation<videoApi.VideoInfo, Error, string>({
-    mutationFn: (url: string) => videoApi.getVideoInfo(url),
+    mutationFn: (url: string) => {
+      console.log('[DashboardPage] infoMutation.mutationFn called with url:', url);
+      return videoApi.getVideoInfo(url);
+    },
     onSuccess: (data) => {
-      console.log('[DashboardPage] Info Mutation onSuccess:', data);
+      console.log('[DashboardPage] Info Mutation onSuccess. Data:', data);
       setSidebarTitle("Video Information");
       setSidebarData(data);
       setErrorForSidebar(null);
+      console.log('[DashboardPage] Info Mutation onSuccess - sidebar state updated.');
     },
     onError: (error) => {
-      console.error('[DashboardPage] Info Mutation onError:', error);
+      console.error('[DashboardPage] Info Mutation onError. Error:', error);
       setSidebarTitle("Error Fetching Info");
       setErrorForSidebar(error.message || "An unknown error occurred.");
       setSidebarData(null);
+      console.log('[DashboardPage] Info Mutation onError - sidebar state updated for error.');
     },
   });
 
   const handleGetInfo = () => {
+    console.log('[DashboardPage] handleGetInfo called. videoUrl:', videoUrl);
     if (!videoUrl) {
+      console.warn('[DashboardPage] handleGetInfo - videoUrl is empty. Alerting user.');
       alert("Please enter a video URL.");
       return;
     }
-    console.log("[DashboardPage] DEBUG: Forcing sidebar open with mock error.");
-    openSidebarForAction("DEBUG: Test Sidebar Opening"); // Sets isSidebarOpen = true
-    setErrorForSidebar("DEBUG: This is a forced error message to test sidebar visibility.");
-    setSidebarData({ debug: "Sidebar forced open for testing." }); // Add some mock data too
-    // infoMutation.mutate(videoUrl); // Temporarily bypass actual API call
+    // console.log("[DashboardPage] DEBUG: Forcing sidebar open with mock error.");
+    // openSidebarForAction("DEBUG: Test Sidebar Opening"); // Sets isSidebarOpen = true
+    // setErrorForSidebar("DEBUG: This is a forced error message to test sidebar visibility.");
+    // setSidebarData({ debug: "Sidebar forced open for testing." }); // Add some mock data too
+
+    console.log('[DashboardPage] handleGetInfo - Calling openSidebarForAction and infoMutation.mutate for URL:', videoUrl);
+    openSidebarForAction("Fetching Video Information..."); // This should open the sidebar immediately with a loading title
+    infoMutation.mutate(videoUrl); // Actual API call
   };
 
   // isLoading for the form/buttons will be a composite of all mutation loading states
