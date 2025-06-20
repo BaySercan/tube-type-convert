@@ -54,8 +54,8 @@ const DashboardPage = () => {
     console.log('[DashboardPage] setIsSidebarOpen(true) - state should be updated.');
   };
 
-  // Specific state for sidebar error, to distinguish from mutation.error
-  const [sidebarError, setErrorForSidebar] = useState<string | null>(null);
+  // Removed duplicate declaration of sidebarError and setErrorForSidebar
+  // const [sidebarError, setErrorForSidebar] = useState<string | null>(null);
 
 
   // --- React Query Mutations ---
