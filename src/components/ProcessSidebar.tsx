@@ -201,10 +201,10 @@ export const ProcessSidebar: React.FC<ProcessSidebarProps> = ({
           </div>
         </div>
 
-        <ScrollArea className="flex-grow pr-6 space-y-4"> {/* Removed my-2 */}
+        <ScrollArea className="flex-grow pr-6">
           {/* AI Transcript Warning */}
           {isTranscriptRequest && (isPollingProgress || (isLoading && !data?.progress && !error)) && (
-            <div className="p-3 border border-sky-600 bg-sky-700/60 rounded-md text-sky-100 text-xs shadow w-full"> {/* Changed to sky theme, removed my-2, added w-full */}
+            <div className="p-3 border border-sky-600 bg-sky-700/60 rounded-md text-sky-100 text-xs shadow w-full mb-4"> {/* Changed to sky theme, removed my-2, added w-full */}
               <div className="flex items-center space-x-2">
                 <InfoIcon className="h-5 w-5 text-sky-300 flex-shrink-0" /> {/* Icon to match sky theme */}
                 <p>
@@ -216,7 +216,7 @@ export const ProcessSidebar: React.FC<ProcessSidebarProps> = ({
 
           {/* Timer Display - Placed outside the AI warning, but still conditional on transcript request & timer having started */}
           {isTranscriptRequest && timerStartTime !== null && (
-            <div className="p-3 bg-slate-700 rounded-md text-center shadow w-full"> {/* Removed my-3, added w-full */}
+            <div className="p-3 bg-slate-700 rounded-md text-center shadow w-full mb-4"> {/* Removed my-3, added w-full */}
               <p className="text-xs text-slate-300 mb-1">Elapsed Time</p>
               <p className="text-2xl font-mono text-cyan-400 tracking-wider">
                 {formatTime(elapsedTime)}
@@ -225,7 +225,7 @@ export const ProcessSidebar: React.FC<ProcessSidebarProps> = ({
           )}
 
           {isLoading && !data?.progress && ( // Show general loading spinner if no progress yet
-            <div className="flex flex-col items-center justify-center h-full space-y-3 text-center w-full"> {/* Added w-full (though flex might handle it) */}
+            <div className="flex flex-col items-center justify-center h-full space-y-3 text-center w-full mb-4"> {/* Added w-full (though flex might handle it) */}
               <Loader2 className="h-10 w-10 animate-spin text-blue-400" />
               <p className="text-lg font-medium text-slate-300">{currentLoadingMessage}</p> {/* Changed text-white to text-slate-300 for better contrast as requested */}
               {/* Removed: <p className="text-sm text-gray-400">Please wait a moment...</p> */}
@@ -233,7 +233,7 @@ export const ProcessSidebar: React.FC<ProcessSidebarProps> = ({
           )}
 
           {error && (
-            <div className="text-red-500 p-3 border border-red-600 bg-red-900/20 rounded-md w-full"> {/* Added w-full */}
+            <div className="text-red-500 p-3 border border-red-600 bg-red-900/20 rounded-md w-full mb-4"> {/* Added w-full */}
               <div className="flex items-center space-x-2">
                 <AlertTriangleIcon className="h-5 w-5 text-red-500" />
                 <p className="font-semibold">Error:</p>
@@ -244,7 +244,7 @@ export const ProcessSidebar: React.FC<ProcessSidebarProps> = ({
 
           {/* Display for initial Async Job Response (202) */}
           {isAsyncJobInitial && data?.message && (
-            <div className="p-4 rounded-md bg-slate-700 text-slate-100 shadow w-full"> {/* New styling, added w-full */}
+            <div className="p-4 rounded-md bg-slate-700 text-slate-100 shadow w-full mb-4"> {/* New styling, added w-full */}
               <div className="flex items-center space-x-2 mb-2">
                 <InfoIcon className="h-5 w-5 text-blue-300 flex-shrink-0" /> {/* Adjusted icon color */}
                 <p className="font-semibold">Processing Started</p>
@@ -255,7 +255,7 @@ export const ProcessSidebar: React.FC<ProcessSidebarProps> = ({
 
           {/* Media Player Section */}
           {data?.mediaUrl && data.mediaType && (
-            <div className="p-4 bg-zinc-800 border border-slate-700 rounded-lg space-y-4 shadow-md w-full"> {/* Changed bg-slate-800/60 to bg-zinc-800, added w-full */}
+            <div className="p-4 bg-zinc-800 border border-slate-700 rounded-lg space-y-4 shadow-md w-full mb-4"> {/* Changed bg-slate-800/60 to bg-zinc-800, added w-full */}
               <h4 className="font-semibold text-base text-gray-100">Media Preview:</h4> {/* Increased text size */}
               {data.mediaType.startsWith('audio/') && (
                 <audio controls src={data.mediaUrl} className="w-full border border-slate-600 rounded-md"> {/* Added border to audio player */}
@@ -292,7 +292,7 @@ export const ProcessSidebar: React.FC<ProcessSidebarProps> = ({
 
           {/* Display for Polling Progress */}
           {isPollingProgress && data && (
-            <div className="space-y-3 p-4 rounded-md bg-slate-700 text-slate-100 shadow w-full"> {/* New styling, increased space-y, added w-full */}
+            <div className="space-y-3 p-4 rounded-md bg-slate-700 text-slate-100 shadow w-full mb-4"> {/* New styling, increased space-y, added w-full */}
               {data.video_title && <p className="text-sm font-medium">Video: <span className="font-normal text-slate-300">{data.video_title}</span></p>}
               <p className="text-sm font-medium">Status: <span className="font-semibold text-amber-400">{data.status}</span></p> {/* Status color changed */}
               {typeof data.progress === 'number' && (
@@ -304,51 +304,9 @@ export const ProcessSidebar: React.FC<ProcessSidebarProps> = ({
             </div>
           )}
 
-          {/* Display JSON data using ReactJson viewer */}
-          {/* This will show the final result, or the initial 202 object if not handled above */}
-          {data && !error && hasJsonDataForViewer && (
-             <div className="bg-gray-800 text-white p-3 rounded-md relative group border border-gray-700 w-full"> {/* Added w-full */}
-              <div className="flex justify-between items-center mb-2">
-                <span className="text-xs font-semibold text-gray-200"> {/* Changed text-gray-400 to text-gray-200 */}
-                  {isFinalData ? "Final Result JSON" : "Response Data"}
-                </span>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-7 w-7 opacity-50 group-hover:opacity-100 transition-opacity"
-                  onClick={handleCopyJson}
-                  title="Copy JSON"
-                >
-                  <Copy className="h-4 w-4" />
-                </Button>
-              </div>
-              <ReactJson
-                src={jsonDataForViewer}
-                theme="ocean"
-                iconStyle="square"
-                displayDataTypes={false}
-                displayObjectSize={false}
-                name={false}
-                style={{ background: 'transparent', fontSize: '0.8rem' }}
-                collapsed={1} // Collapse deeper levels
-                enableClipboard={(copy) => {
-                  // This function will be called by react-json-view with the data to be copied
-                  // The library handles the actual clipboard writing.
-                  // We can log here to confirm it's firing.
-                  console.log('ReactJson copy event:', copy);
-                  // Default behavior is to copy copy.src or JSON.stringify(copy.src)
-                  // No need to call navigator.clipboard.writeText here unless we want to override.
-                  // To ensure the library's default copy works, we should return true or nothing.
-                  // If we wanted to PREVENT copy, we'd return false.
-                }}
-                iconStyle="circle" // Changed from "square" to "circle" to see if it affects visibility/interaction
-              />
-            </div>
-          )}
-
           {/* Display Endpoints if available (from initial 202 or progress) - MOVED TO BOTTOM */}
           {data && (data.progressEndpoint || data.resultEndpoint) && (
-            <div className="space-y-2 p-4 rounded-md bg-slate-700 text-slate-100 shadow w-full"> {/* Changed styling, consistent with other cards, removed mt-4, added w-full */}
+            <div className="space-y-2 p-4 rounded-md bg-slate-700 text-slate-100 shadow w-full mb-4"> {/* Changed styling, consistent with other cards, removed mt-4, added w-full */}
               <h4 className="font-semibold text-base text-slate-100 mb-2">API Endpoints:</h4> {/* Increased text size and margin */}
               {data.progressEndpoint && data.processingId && (
                 <div className="flex items-center space-x-2">

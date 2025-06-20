@@ -14,6 +14,19 @@ const ENCODED_TEST_VIDEO_URL = encodeURIComponent(TEST_VIDEO_URL);
 const mockedAuthenticatedFetch = authenticatedFetch as ReturnType<typeof vi.fn>;
 
 describe('Video API Functions', () => {
+  // JSDOM's Blob doesn't have arrayBuffer, so we polyfill/mock it for tests
+  if (typeof Blob.prototype.arrayBuffer === 'undefined') {
+    Blob.prototype.arrayBuffer = async function() {
+      return new Promise((resolve) => {
+        const fr = new FileReader();
+        fr.onload = () => {
+          resolve(fr.result as ArrayBuffer);
+        };
+        fr.readAsArrayBuffer(this);
+      });
+    };
+  }
+
   beforeEach(() => {
     // Reset mocks before each test
     mockedAuthenticatedFetch.mockReset();
@@ -51,7 +64,7 @@ describe('Video API Functions', () => {
       const mockBlob = new Blob([mockBlobContent], { type: 'audio/mpeg' });
       mockedAuthenticatedFetch.mockResolvedValueOnce({
         ok: true,
-        blob: async () => mockBlob,
+        blob: () => Promise.resolve(mockBlob), // blob is a function that returns a Promise<Blob>
       } as Response);
 
       const result = await videoApi.downloadMp3(TEST_VIDEO_URL);
@@ -82,7 +95,7 @@ describe('Video API Functions', () => {
       const mockBlob = new Blob([mockBlobContent], { type: 'video/mp4' });
       mockedAuthenticatedFetch.mockResolvedValueOnce({
         ok: true,
-        blob: async () => mockBlob,
+        blob: () => Promise.resolve(mockBlob), // blob is a function that returns a Promise<Blob>
       } as Response);
 
       const result = await videoApi.downloadMp4(TEST_VIDEO_URL);
