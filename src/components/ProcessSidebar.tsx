@@ -216,22 +216,16 @@ export const ProcessSidebar: React.FC<ProcessSidebarProps> = ({
 
           {/* ReactJson viewer for any other data that isn't specifically handled above */}
           {hasJsonDataForViewer && !isPollingProgress && !data?.mediaUrl && ( // Conditionally render if there's data and it's not progress or media
-            <div className="p-4 rounded-md bg-slate-800/60 border border-slate-700 shadow w-full mb-4">
-              <div className="flex justify-between items-center mb-2">
-                <h4 className="font-semibold text-base text-slate-100">JSON Data:</h4>
-                <Button variant="ghost" size="sm" onClick={handleCopyJson} className="text-slate-300 hover:text-slate-100">
-                  <Copy className="h-4 w-4 mr-1" /> Copy
-                </Button>
-              </div>
+            <div className="rounded-md bg-slate-800/60 border border-slate-700 shadow w-full mb-4 overflow-hidden"> {/* Added overflow-hidden, removed p-4 for ReactJson to control padding */}
               <ReactJson
                 src={jsonDataForViewer}
-                theme="ocean" // Or your preferred theme: "ashes", "bespin", "brewer", "bright", "chalk", "codeschool", "colors", "eighties", "embers", "flat", "google", "grayscale", "greenscreen", "harmonic", "hopscotch", "isotope", "marrakesh", "mocha", "monokai", "ocean", "paraiso", "pop", "railscasts", "rjv-default", "shapeshifter", "solarized", "summerfruit", "tomorrow", "tube", "twilight"
-                name={false}
+                theme="ocean" // Or your preferred theme
+                name={null} // Setting to null or false to remove the root "root" name
                 iconStyle="circle"
-                displayObjectSize={false}
-                displayDataTypes={false}
-                enableClipboard={false} // Using custom copy button
-                style={{ padding: '10px', borderRadius: '4px', backgroundColor: 'rgba(30, 41, 59, 0.9)' }} // slate-800 equivalent with some transparency
+                displayObjectSize={true} // User might want to see this
+                displayDataTypes={true}  // User might want to see this
+                enableClipboard={true} // Enable built-in copy feature
+                style={{ padding: '1rem', backgroundColor: 'transparent' }} // ReactJson will be inside a styled div
               />
             </div>
           )}
