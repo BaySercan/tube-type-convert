@@ -3,6 +3,8 @@ import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabaseClient'; // Ensure this path is correct
 import { setCustomApiToken as storeTokenInGlobalStore, getCustomApiToken as retrieveTokenFromGlobalStore } from '@/lib/apiTokenStore'; // Corrected import
 
+const API_BASE_URL = import.meta.env.VITE_YOUTUBE_MULTI_API_URL || 'http://localhost:3500';
+
 export type UserProfile = {
   id: string; // UUID
   full_name: string | null;
@@ -50,7 +52,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setCustomApiTokenError(null); // Clear previous errors
 
     try {
-      const response = await fetch('http://localhost:3500/auth/exchange-token', {
+      const response = await fetch(`${API_BASE_URL}/auth/exchange-token`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
