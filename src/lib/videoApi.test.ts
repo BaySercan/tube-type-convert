@@ -14,7 +14,8 @@ const ENCODED_TEST_VIDEO_URL = encodeURIComponent(TEST_VIDEO_URL);
 const mockedAuthenticatedFetch = authenticatedFetch as ReturnType<typeof vi.fn>;
 
 // Define API_BASE_URL for tests, mirroring the logic in videoApi.ts
-const API_BASE_URL = process.env.YOUTUBE_MULTI_API_URL || 'http://localhost:3500';
+// In Vitest, import.meta.env should work, but ensure your .env files or Vitest config handles VITE_ prefixed vars.
+const API_BASE_URL = import.meta.env.VITE_YOUTUBE_MULTI_API_URL || 'http://localhost:3500';
 
 describe('Video API Functions', () => {
   // JSDOM's Blob doesn't have arrayBuffer, so we polyfill/mock it for tests

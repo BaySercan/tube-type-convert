@@ -1,7 +1,7 @@
 import { authenticatedFetch } from './apiClient';
 
 // Use environment variable for API base URL, with a fallback for local development
-const API_BASE_URL = process.env.YOUTUBE_MULTI_API_URL || 'http://localhost:3500';
+const API_BASE_URL = import.meta.env.VITE_YOUTUBE_MULTI_API_URL || 'http://localhost:3500';
 
 // Types based on openapi.yaml - consider generating these for more complex APIs
 
