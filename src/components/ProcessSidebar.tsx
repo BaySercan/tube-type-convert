@@ -192,21 +192,21 @@ export const ProcessSidebar: React.FC<ProcessSidebarProps> = ({
         </SheetHeader>
 
         {/* Warning Message */}
-        <div className="p-3 mb-4 w-full border border-red-600 bg-red-800/80 rounded-md text-red-100 text-xs"> {/* Changed to red theme for higher alert, adjusted margins/width */}
+        <div className="p-3 mb-4 w-full border border-red-600 bg-yellow-400/80 rounded-md text-black-100 text-xs"> {/* Changed to red theme for higher alert, adjusted margins/width */}
           <div className="flex items-center space-x-2">
-            <AlertTriangleIcon className="h-5 w-5 text-red-300 flex-shrink-0" /> {/* Icon to match red theme */}
+            <AlertTriangleIcon className="h-5 w-5 text-orange-600 flex-shrink-0" /> {/* Icon to match red theme */}
             <p>
-              <strong>Important:</strong> Results displayed here are temporary. Please save your data (copy JSON, download files) as it will be lost when you close this panel or start a new process.
+              <strong className="text-red-600">Important:</strong> Results displayed here are <strong>temporary</strong>. Please save your data (copy JSON, download files) as it will be lost when you close this panel or start a new process.
             </p>
           </div>
         </div>
 
-        <ScrollArea className="flex-grow pr-6">
+        <ScrollArea className="flex-grow pr-6 w-full justify-center">
           {/* AI Transcript Warning */}
           {isTranscriptRequest && (isPollingProgress || (isLoading && !data?.progress && !error)) && (
-            <div className="p-3 border border-sky-600 bg-sky-700/60 rounded-md text-sky-100 text-xs shadow w-full mb-4"> {/* Changed to sky theme, removed my-2, added w-full */}
+            <div className="p-3 border border-sky-600 bg-gray-900/60 rounded-md text-yellow-300 text-xs shadow w-full mb-4"> {/* Changed to sky theme, removed my-2, added w-full */}
               <div className="flex items-center space-x-2">
-                <InfoIcon className="h-5 w-5 text-sky-300 flex-shrink-0" /> {/* Icon to match sky theme */}
+                <InfoIcon className="h-5 w-5 text-stone-300 flex-shrink-0" /> {/* Icon to match sky theme */}
                 <p>
                   AI transcription can take some time depending on the video length. Please be patient.
                 </p>
@@ -216,7 +216,7 @@ export const ProcessSidebar: React.FC<ProcessSidebarProps> = ({
 
           {/* ReactJson viewer for any other data that isn't specifically handled above */}
           {hasJsonDataForViewer && !isPollingProgress && !data?.mediaUrl && ( // Conditionally render if there's data and it's not progress or media
-            <div className="rounded-md bg-slate-800/60 border border-slate-700 shadow w-full mb-4 overflow-hidden"> {/* Added overflow-hidden, removed p-4 for ReactJson to control padding */}
+            <div className="rounded-md bg-slate-800/60 border border-slate-900 shadow w-full mb-4 overflow-hidden"> {/* Added overflow-hidden, removed p-4 for ReactJson to control padding */}
               <ReactJson
                 src={jsonDataForViewer}
                 theme="ocean" // Or your preferred theme
@@ -225,7 +225,7 @@ export const ProcessSidebar: React.FC<ProcessSidebarProps> = ({
                 displayObjectSize={true} // User might want to see this
                 displayDataTypes={true}  // User might want to see this
                 enableClipboard={true} // Enable built-in copy feature
-                style={{ padding: '1rem', backgroundColor: 'transparent' }} // ReactJson will be inside a styled div
+                style={{ padding: '1rem', backgroundColor: 'black' }} // ReactJson will be inside a styled div
               />
             </div>
           )}
@@ -233,8 +233,8 @@ export const ProcessSidebar: React.FC<ProcessSidebarProps> = ({
           {/* Timer Display - Placed outside the AI warning, but still conditional on transcript request & timer having started */}
           {isTranscriptRequest && timerStartTime !== null && (
             <div className="p-3 bg-slate-700 rounded-md text-center shadow w-full mb-4"> {/* Removed my-3, added w-full */}
-              <p className="text-xs text-slate-300 mb-1">Elapsed Time</p>
-              <p className="text-2xl font-mono text-cyan-400 tracking-wider">
+              <p className="text-md text-slate-300 mb-1">Elapsed Time</p>
+              <p className="text-4xl font-mono text-cyan-400 tracking-wider">
                 {formatTime(elapsedTime)}
               </p>
             </div>
@@ -243,7 +243,7 @@ export const ProcessSidebar: React.FC<ProcessSidebarProps> = ({
           {isLoading && !data?.progress && ( // Show general loading spinner if no progress yet
             <div className="flex flex-col items-center justify-center h-full space-y-3 text-center w-full mb-4"> {/* Added w-full (though flex might handle it) */}
               <Loader2 className="h-10 w-10 animate-spin text-blue-400" />
-              <p className="text-lg font-medium text-slate-300">{currentLoadingMessage}</p> {/* Changed text-white to text-slate-300 for better contrast as requested */}
+              <p className="text-lg font-medium text-gray-800">{currentLoadingMessage}</p> {/* Changed text-white to text-slate-300 for better contrast as requested */}
               {/* Removed: <p className="text-sm text-gray-400">Please wait a moment...</p> */}
             </div>
           )}
