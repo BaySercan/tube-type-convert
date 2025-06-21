@@ -10,7 +10,7 @@ servers:
   - url: http://localhost:3500
     description: Local development server
   - url: https://p01--youtube-multi-api-private-srv--yfb9ttcdx8bx.code.run
-    description: Production server (Private Service)
+    description: Production server (Private Service) - URL is configurable via YOUTUBE_MULTI_API_URL environment variable
     
 security:
   - BearerAuth: []
