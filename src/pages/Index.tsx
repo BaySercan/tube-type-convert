@@ -419,7 +419,7 @@ const Index = () => {
                       className={`p-4 rounded-lg border-2 transition-all duration-300 text-left group hover:scale-105 relative ${
                         selectedOutput === option.id
                           ? 'border-gray-400 bg-gray-700/40 shadow-lg shadow-gray-700/25'
-                          : 'border-gray-600/40 bg-gray-800/20 hover:border-emerald-500/60 hover:bg-sky-400/30'
+                          : 'border-gray-600/40 bg-gray-800/20 hover:border-gray-500/60 hover:bg-gray-700/30'
                       } ${isProcessing ? 'opacity-50 cursor-not-allowed' : ''}`}
                     >
                       {option.isAI && (
@@ -429,7 +429,7 @@ const Index = () => {
                       )}
                       <div className="flex items-start space-x-3">
                         <div className={`p-2 rounded-lg transition-colors ${
-                          selectedOutput === option.id ? 'bg-rose-600' : 'bg-rose-700/60 group-hover:bg-rose-600/80'
+                          selectedOutput === option.id ? 'bg-gray-600' : 'bg-gray-700/60 group-hover:bg-gray-600/80'
                         }`}>
                           <IconComponent className="w-5 h-5 text-gray-100" />
                         </div>
@@ -470,7 +470,7 @@ const Index = () => {
                   ) : (
                     <>
                       <Zap className="w-7 h-7" />
-                      <span>Start Process</span>
+                      <span>Process Request</span>
                       <Zap className="w-7 h-7" />
                     </>
                   )}
