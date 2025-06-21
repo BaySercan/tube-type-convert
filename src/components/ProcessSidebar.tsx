@@ -204,7 +204,7 @@ export const ProcessSidebar: React.FC<ProcessSidebarProps> = ({
         <ScrollArea className="flex-grow pr-6">
           {/* AI Transcript Warning */}
           {isTranscriptRequest && (isPollingProgress || (isLoading && !data?.progress && !error)) && (
-            <div className="p-3 border border-sky-600 bg-sky-700/60 rounded-md text-sky-100 text-xs shadow w-full mb-4"> {/* Changed to sky theme, removed my-2, added w-full */}
+            <div className="p-3 border border-sky-600 bg-sky-900/60 rounded-md text-sky-100 text-xs shadow w-full mb-4"> {/* Changed to sky theme, removed my-2, added w-full */}
               <div className="flex items-center space-x-2">
                 <InfoIcon className="h-5 w-5 text-sky-300 flex-shrink-0" /> {/* Icon to match sky theme */}
                 <p>
@@ -234,7 +234,7 @@ export const ProcessSidebar: React.FC<ProcessSidebarProps> = ({
                 displayObjectSize={true}
                 displayDataTypes={true}
                 enableClipboard={false} // Disable built-in copy feature as it's not working reliably
-                style={{ padding: '1rem', paddingTop: '2.5rem', backgroundColor: 'transparent' }} // Added paddingTop to avoid overlap with copy button
+                style={{ padding: '1rem', paddingTop: '2.5rem', backgroundColor: 'black' }} // Added paddingTop to avoid overlap with copy button
               />
             </div>
           )}
@@ -252,7 +252,7 @@ export const ProcessSidebar: React.FC<ProcessSidebarProps> = ({
           {isLoading && !data?.progress && ( // Show general loading spinner if no progress yet
             <div className="flex flex-col items-center justify-center h-full space-y-3 text-center w-full mb-4"> {/* Added w-full (though flex might handle it) */}
               <Loader2 className="h-10 w-10 animate-spin text-blue-400" />
-              <p className="text-lg font-medium text-slate-300">{currentLoadingMessage}</p> {/* Changed text-white to text-slate-300 for better contrast as requested */}
+              <p className="text-lg font-medium text-gray-700">{currentLoadingMessage}</p> {/* Changed text-white to text-slate-300 for better contrast as requested */}
               {/* Removed: <p className="text-sm text-gray-400">Please wait a moment...</p> */}
             </div>
           )}

@@ -389,7 +389,7 @@ const Index = () => {
                 </div>
                 <h1 className="text-3xl font-bold text-gray-100">YouTube Converter</h1>
               </div>
-              <p className="text-gray-300 text-lg">Convert YouTube videos to MP3, MP4, get transcripts or video info</p>
+              <p className="text-gray-300 text-lg">Convert YouTube videos to MP3, MP4, get AI generated transcripts or video info</p>
             </div>
 
             {/* URL Input */}
@@ -429,7 +429,7 @@ const Index = () => {
                       )}
                       <div className="flex items-start space-x-3">
                         <div className={`p-2 rounded-lg transition-colors ${
-                          selectedOutput === option.id ? 'bg-gray-600' : 'bg-gray-700/60 group-hover:bg-gray-600/80'
+                          selectedOutput === option.id ? 'bg-rose-600' : 'bg-rose-700/60 group-hover:bg-rose-600/80'
                         }`}>
                           <IconComponent className="w-5 h-5 text-gray-100" />
                         </div>
@@ -470,7 +470,7 @@ const Index = () => {
                   ) : (
                     <>
                       <Zap className="w-7 h-7" />
-                      <span>Process Request</span>
+                      <span>Start Process</span>
                       <Zap className="w-7 h-7" />
                     </>
                   )}
