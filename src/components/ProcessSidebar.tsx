@@ -25,6 +25,11 @@ interface SidebarData {
   resultEndpoint?: string;
   originalUrl?: string; // Added for passing to progress/result pages
 
+  // Transcript request parameters (to be displayed if present)
+  requestedLang?: string;
+  requestedSkipAI?: boolean;
+  requestedUseDeepSeek?: boolean;
+
   // Properties from ProgressResponse (polling)
   status?: string;        // e.g., "processing", "completed", "failed"
   progress?: number;      // Percentage 0-100
@@ -166,7 +171,8 @@ export const ProcessSidebar: React.FC<ProcessSidebarProps> = ({
     Object.entries(data).filter(([key]) => ![
       'processingId', 'message', 'progressEndpoint', 'resultEndpoint',
       'status', 'progress', 'video_title', 'lastUpdated',
-      'mediaUrl', 'mediaType', 'fileName' // Exclude media player fields
+      'mediaUrl', 'mediaType', 'fileName', // Exclude media player fields
+      'requestedLang', 'requestedSkipAI', 'requestedUseDeepSeek', 'originalUrl' // Exclude request params as they are displayed separately
     ].includes(key))
   ) : {};
   const hasJsonDataForViewer = Object.keys(jsonDataForViewer).length > 0;
@@ -210,6 +216,26 @@ export const ProcessSidebar: React.FC<ProcessSidebarProps> = ({
                 <p>
                   AI transcription can take some time depending on the video length. Please be patient.
                 </p>
+              </div>
+            </div>
+          )}
+
+          {/* Display Transcript Request Parameters */}
+          {isTranscriptRequest && data && (typeof data.requestedLang !== 'undefined' || typeof data.requestedSkipAI !== 'undefined' || typeof data.requestedUseDeepSeek !== 'undefined') && (
+            <div className="p-4 rounded-md bg-slate-700/80 text-slate-100 shadow-md w-full mb-4 border border-slate-600">
+              <h4 className="font-semibold text-base text-slate-100 mb-3 pb-2 border-b border-slate-600">
+                Transcript Request Options
+              </h4>
+              <div className="space-y-2 text-sm">
+                {typeof data.requestedLang !== 'undefined' && (
+                  <p><strong>Language:</strong> <span className="text-slate-300">{data.requestedLang}</span></p>
+                )}
+                {typeof data.requestedSkipAI !== 'undefined' && (
+                  <p><strong>Skip AI Post-processing:</strong> <span className="text-slate-300">{data.requestedSkipAI ? 'Yes' : 'No'}</span></p>
+                )}
+                {typeof data.requestedUseDeepSeek !== 'undefined' && (
+                  <p><strong>Use DeepSeek Model:</strong> <span className="text-slate-300">{data.requestedUseDeepSeek ? 'Yes' : 'No'}</span></p>
+                )}
               </div>
             </div>
           )}

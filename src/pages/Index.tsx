@@ -10,6 +10,16 @@ import { Youtube, Download, FileText, Info, Music, Video, Zap, Sparkles, Loader2
 import { supabase } from '@/lib/supabaseClient';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
+import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+
 
 // Imports from DashboardPage
 import { ProcessSidebar } from "@/components/ProcessSidebar";
@@ -25,9 +35,14 @@ const Index = () => {
   const [selectedOutput, setSelectedOutput] = useState('');
   // const [isProcessing, setIsProcessing] = useState(false); // Will be replaced by mutation loading states
 
+  // State for AI Transcript options
+  const [transcriptLang, setTranscriptLang] = useState('tr');
+  const [transcriptSkipAI, setTranscriptSkipAI] = useState(false);
+  const [transcriptUseDeepSeek, setTranscriptUseDeepSeek] = useState(true);
+
   // State for ProcessSidebar (from DashboardPage)
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [sidebarData, setSidebarData] = useState<object | null>(null); // This will hold various data structures
+  const [sidebarData, setSidebarData] = useState<any | null>(null); // This will hold various data structures // Changed to any for flexibility
   const [sidebarTitle, setSidebarTitle] = useState("Process Details");
   const [sidebarError, setErrorForSidebar] = useState<string | null>(null);
   const [showReopenButton, setShowReopenButton] = useState(true); // Initialize to true, as sidebar is initially closed
@@ -39,6 +54,14 @@ const Index = () => {
   // queryClient can be useful for cache invalidation or refetching, uncomment if needed
   const queryClient = useQueryClient();
 
+  const transcriptLanguages = [
+    { value: 'tr', label: 'Turkish' },
+    { value: 'en', label: 'English' },
+    { value: 'es', label: 'Spanish' },
+    { value: 'fr', label: 'French' },
+    { value: 'de', label: 'German' },
+    // Add more languages as needed
+  ];
 
   const outputOptions = [
     { id: 'mp3', label: 'MP3 Audio', icon: Music, description: 'Extract audio as MP3' },
@@ -46,6 +69,15 @@ const Index = () => {
     { id: 'transcript', label: 'AI Transcript', icon: FileText, description: 'Get AI-powered video transcript', isAI: true },
     { id: 'info', label: 'Video Info', icon: Info, description: 'Get video metadata' }
   ];
+
+  // Effect to reset transcript options when selectedOutput changes
+  useEffect(() => {
+    if (selectedOutput !== 'transcript') {
+      setTranscriptLang('tr');
+      setTranscriptSkipAI(false);
+      setTranscriptUseDeepSeek(true);
+    }
+  }, [selectedOutput]);
 
   const isValidYouTubeUrl = (url: string) => {
     const regex = /^(https?:\/\/)?(www\.)?(youtube\.com\/(watch\?v=|embed\/)|youtu\.be\/)[\w-]+/;
@@ -159,41 +191,67 @@ const Index = () => {
     return response && typeof response.processingId === 'string';
   }
 
-  const transcriptMutation = useMutation<TranscriptResponse | AsyncJobResponse, Error, string>({
-    mutationFn: (videoUrl: string) => {
-      console.log('[IndexPage] transcriptMutation.mutationFn called with url:', videoUrl);
-      return videoApi.getVideoTranscript(videoUrl);
+  // Define type for transcript mutation arguments
+  type TranscriptMutationArgs = {
+    videoUrl: string;
+    lang: string;
+    skipAI: boolean;
+    useDeepSeek: boolean;
+  };
+
+  const transcriptMutation = useMutation<
+    TranscriptResponse | AsyncJobResponse,
+    Error,
+    TranscriptMutationArgs
+  >({
+    mutationFn: (args: TranscriptMutationArgs) => {
+      console.log('[IndexPage] transcriptMutation.mutationFn called with args:', args);
+      return videoApi.getVideoTranscript(args.videoUrl, args.lang, args.skipAI, args.useDeepSeek);
     },
-    onSuccess: (data) => {
+    onSuccess: (data, variables) => { // Added variables here
       console.log('[IndexPage] Transcript Mutation onSuccess:', data);
       setErrorForSidebar(null);
       setCurrentProcessingId(null); // Clear any previous processing ID
 
+      // Include used parameters in sidebarData
+      const baseSidebarData = {
+        originalUrl: variables.videoUrl,
+        requestedLang: variables.lang,
+        requestedSkipAI: variables.skipAI,
+        requestedUseDeepSeek: variables.useDeepSeek,
+      };
+
       if (isAsyncJobResponse(data)) {
         setSidebarTitle("Transcript Processing Started");
-        setSidebarData({ // Store the async job details
+        setSidebarData({
+          ...baseSidebarData,
           message: data.message,
           processingId: data.processingId,
           progressEndpoint: data.progressEndpoint,
           resultEndpoint: data.resultEndpoint,
           status: "processing_initiated", // Custom status
-          originalUrl: url, // Add originalUrl for transcript requests
         });
         setCurrentProcessingId(data.processingId); // Start polling for this ID
         console.log(`[IndexPage] Transcript is async. Processing ID: ${data.processingId}`);
       } else {
         // Direct response (TranscriptResponse)
         setSidebarTitle("Video Transcript");
-        setSidebarData({...data, originalUrl: url }); // Add originalUrl here too
+        setSidebarData({ ...baseSidebarData, ...data });
         console.log('[IndexPage] Transcript received directly.');
       }
     },
-    onError: (error) => {
+    onError: (error, variables) => { // Added variables here
       console.error('[IndexPage] Transcript Mutation onError:', error);
       setCurrentProcessingId(null); // Stop polling on error
       setSidebarTitle("Error Fetching Transcript");
       setErrorForSidebar(error.message || "An unknown error occurred.");
-      setSidebarData(null);
+      // Also include parameters in sidebarData on error, so user knows what failed
+      setSidebarData({
+        originalUrl: variables.videoUrl,
+        requestedLang: variables.lang,
+        requestedSkipAI: variables.skipAI,
+        requestedUseDeepSeek: variables.useDeepSeek,
+      });
     },
   });
 
@@ -354,7 +412,12 @@ const Index = () => {
         break;
       case 'transcript':
         openSidebarForAction("Fetching Transcript...");
-        transcriptMutation.mutate(url);
+        transcriptMutation.mutate({
+          videoUrl: url,
+          lang: transcriptLang,
+          skipAI: transcriptSkipAI,
+          useDeepSeek: transcriptUseDeepSeek,
+        });
         break;
       default:
         console.error("Unknown output type:", selectedOutput);
@@ -414,7 +477,11 @@ const Index = () => {
                   return (
                     <button
                       key={option.id}
-                      onClick={() => !isProcessing && setSelectedOutput(option.id)} // Disable selection while processing
+                      onClick={() => {
+                        if (!isProcessing) {
+                          setSelectedOutput(option.id);
+                        }
+                      }}
                       disabled={isProcessing} // Disable button while processing
                       className={`p-4 rounded-lg border-2 transition-all duration-300 text-left group hover:scale-105 relative ${
                         selectedOutput === option.id
@@ -451,8 +518,67 @@ const Index = () => {
               </div>
             </div>
 
+            {/* AI Transcript Options */}
+            {selectedOutput === 'transcript' && (
+              <div className="space-y-6 p-6 bg-gray-800/30 border border-gray-700/40 rounded-lg shadow-md mt-6">
+                <h3 className="text-lg font-semibold text-gray-100 mb-4 border-b border-gray-600/50 pb-3">AI Transcript Options</h3>
+
+                {/* Language Selection */}
+                <div className="space-y-2">
+                  <Label htmlFor="transcript-lang" className="text-gray-300 font-medium">Language</Label>
+                  <Select
+                    value={transcriptLang}
+                    onValueChange={setTranscriptLang}
+                    disabled={isProcessing}
+                  >
+                    <SelectTrigger id="transcript-lang" className="w-full bg-gray-700/50 border-gray-600 text-gray-100 focus:bg-gray-700 focus:border-gray-500">
+                      <SelectValue placeholder="Select language" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-gray-800 border-gray-700 text-gray-100">
+                      {transcriptLanguages.map(lang => (
+                        <SelectItem key={lang.value} value={lang.value} className="hover:bg-gray-700 focus:bg-gray-700">
+                          {lang.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Skip AI Checkbox */}
+                <div className="flex items-center space-x-3 pt-2">
+                  <Checkbox
+                    id="skip-ai"
+                    checked={transcriptSkipAI}
+                    onCheckedChange={(checked) => setTranscriptSkipAI(checked as boolean)}
+                    disabled={isProcessing}
+                    className="border-gray-500 data-[state=checked]:bg-blue-500 data-[state=checked]:border-blue-500 focus-visible:ring-blue-400"
+                  />
+                  <Label htmlFor="skip-ai" className="text-gray-300 font-medium cursor-pointer">
+                    Skip AI Post-processing (Plain Transcript)
+                  </Label>
+                </div>
+
+                {/* Use DeepSeek Checkbox */}
+                <div className="flex items-center space-x-3 pt-2">
+                  <Checkbox
+                    id="use-deepseek"
+                    checked={transcriptUseDeepSeek}
+                    onCheckedChange={(checked) => setTranscriptUseDeepSeek(checked as boolean)}
+                    disabled={isProcessing}
+                    className="border-gray-500 data-[state=checked]:bg-purple-500 data-[state=checked]:border-purple-500 focus-visible:ring-purple-400"
+                  />
+                  <Label htmlFor="use-deepseek" className="text-gray-300 font-medium cursor-pointer">
+                    Use DeepSeek Model (Advanced AI)
+                  </Label>
+                </div>
+                 <p className="text-xs text-gray-400 mt-2">
+                    Note: DeepSeek typically provides higher quality results but may take longer. Deselecting it might use a faster, alternative model if available. If "Skip AI" is checked, this option has no effect.
+                  </p>
+              </div>
+            )}
+
             {/* Process Button */}
-            <div className="relative">
+            <div className="relative pt-4"> {/* Added pt-4 for spacing if AI options are shown */}
               <Button
                 onClick={handleProcess}
                 disabled={isProcessing || !url || !selectedOutput} // Disable if processing, or no URL/output selected
