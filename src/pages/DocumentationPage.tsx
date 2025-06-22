@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
-import { Youtube, Music, Video, FileText, Info, Settings, Zap, HelpCircle, ChevronRight, Menu, X } from 'lucide-react';
+import { Youtube, Music, Video, FileText, Info, Settings, Zap, HelpCircle, ChevronRight, Menu, X, ChevronsLeft } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
 
 const documentationSections = [
