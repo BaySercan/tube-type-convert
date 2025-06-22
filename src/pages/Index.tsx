@@ -364,31 +364,58 @@ const Index = () => {
 
   useEffect(() => {
     if (resultData) {
-      // console.log(`[IndexPage] Result fetched successfully for ${jobIdForResults}. Raw data:`, JSON.parse(JSON.stringify(resultData)));
-      const finalResultData: ProcessSidebarData = {
-        success: resultData.success,
-        title: resultData.title,
-        language: resultData.language,
-        transcript: resultData.transcript,
-        ai_notes: resultData.ai_notes,
-        isProcessed: resultData.isProcessed,
-        processor: resultData.processor,
-        video_id: resultData.video_id,
-        channel_id: resultData.channel_id,
-        channel_name: resultData.channel_name,
-        post_date: resultData.post_date,
-        status: "final_result_displayed",
-      };
-      // console.log('[IndexPage] Setting cleaned finalResultData to sidebar:', JSON.parse(JSON.stringify(finalResultData)));
+      console.log(`[IndexPage] Result fetched successfully for job ${jobIdForResults}. Data:`, resultData);
+      setSidebarData(prevData => {
+        // Preserve relevant fields from prevData, especially initial request parameters
+        const preservedData: Partial<ProcessSidebarData> = {
+          originalUrl: prevData?.originalUrl,
+          requestedLang: prevData?.requestedLang,
+          requestedSkipAI: prevData?.requestedSkipAI,
+          requestedUseDeepSeek: prevData?.requestedUseDeepSeek,
+          video_title: prevData?.video_title || resultData.title, // Prefer fresh title, fallback to previous
+          lastUpdated: prevData?.lastUpdated, // Can keep lastUpdated from polling
+        };
+
+        const newFinalResultData: ProcessSidebarData = {
+          ...preservedData, // Spread the preserved fields first
+
+          // Fields from TranscriptResponse (API result)
+          success: resultData.success,
+          title: resultData.title, // Overwrite video_title if resultData.title is fresher
+          language: resultData.language,
+          transcript: resultData.transcript,
+          ai_notes: resultData.ai_notes,
+          isProcessed: resultData.isProcessed,
+          processor: resultData.processor,
+          video_id: resultData.video_id,
+          channel_id: resultData.channel_id,
+          channel_name: resultData.channel_name,
+          post_date: resultData.post_date,
+
+          // Frontend specific status for ProcessSidebar
+          status: "final_result_displayed",
+
+          // Explicitly clear/reset fields related to polling/async process
+          // to ensure ProcessSidebar transitions correctly out of polling display
+          processingId: undefined,
+          progress: undefined, // Clear progress percentage
+          message: "Transcript successfully loaded.", // Set a success message or clear
+          progressEndpoint: undefined,
+          resultEndpoint: undefined,
+          // mediaUrl, mediaType, fileName should be undefined if not set by this result type
+        };
+        console.log('[IndexPage] Setting newFinalResultData to sidebar:', newFinalResultData);
+        return newFinalResultData;
+      });
+
       setSidebarTitle("Transcript Result");
-      setSidebarData(finalResultData);
       setErrorForSidebar(null);
-      setJobIdForResults(null);
-      if (jobIdForResults) { // Ensure jobIdForResults is not null before invalidating
+      setJobIdForResults(null); // Stop further queries for this job
+      if (jobIdForResults) { // Ensure jobIdForResults was not already null
         queryClient.invalidateQueries({ queryKey: ['result', jobIdForResults] });
       }
     }
-  }, [resultData, jobIdForResults, queryClient]);
+  }, [resultData, jobIdForResults, queryClient]); // queryClient was already a dependency
 
   useEffect(() => {
     if (resultError) {
