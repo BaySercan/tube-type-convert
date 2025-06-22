@@ -58,6 +58,21 @@ interface ErrorResponse {
   // Add other potential error fields
 }
 
+// Custom error for when the result is still processing (HTTP 202 from /result endpoint)
+export class StillProcessingError extends Error {
+  status: string;
+  progress: number;
+
+  constructor(status: string, progress: number, message?: string) {
+    super(message || `Result is still processing. Status: ${status}, Progress: ${progress}%`);
+    this.name = "StillProcessingError";
+    this.status = status;
+    this.progress = progress;
+    // Set the prototype explicitly.
+    Object.setPrototypeOf(this, StillProcessingError.prototype);
+  }
+}
+
 export const getVideoInfo = async (videoUrl: string): Promise<VideoInfo> => {
   const response = await authenticatedFetch(`${API_BASE_URL}/info?url=${encodeURIComponent(videoUrl)}`);
   if (!response.ok) {
@@ -151,8 +166,8 @@ export const getProcessingResult = async (jobId: string): Promise<ResultResponse
     // We could throw a specific error or return a type indicating it's not ready
     const progressData = await response.json() as ProgressResponse;
     // For the purpose of getProcessingResult, a 202 means the *final* result isn't ready.
-    // Throw an error that can be caught by the polling logic to continue polling.
-    throw new Error(`Result not yet available. Status: ${progressData.status}, Progress: ${progressData.progress}%`);
+    // Throw a specific error that can be caught by the polling logic to continue polling or retry.
+    throw new StillProcessingError(progressData.status, progressData.progress, `Result not yet available. Status: ${progressData.status}, Progress: ${progressData.progress}%`);
   }
   // If it's 200 OK, it should be the final result (e.g. TranscriptResponse)
   return response.json(); // Assuming it's TranscriptResponse or a similar structure for other job types
