@@ -735,7 +735,7 @@ const Index = () => {
       )}
 
       {/* Pricing Section Placeholder */}
-      <div id="pricing" className="py-16 bg-gray-800/10">
+      <div id="pricing" className="py-16 bg-gray-800/10 hidden">
         <div className="max-w-4xl mx-auto px-4 text-center">
           <h2 className="text-3xl font-bold text-gray-100 mb-4">Pricing</h2>
           <p className="text-gray-300 text-lg mb-8">
