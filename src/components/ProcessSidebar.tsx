@@ -122,11 +122,11 @@ export const ProcessSidebar: React.FC<ProcessSidebarProps> = ({
     return () => {
       clearInterval(messageInterval);
     };
-  }, [isLoading, data?.progress]); // Rerun effect if isLoading or progress status changes
+  }, [isLoading, data?.progress, funnyWaitingMessages]); // Rerun effect if isLoading or progress status changes
 
   // Timer effect for AI transcript
   useEffect(() => {
-    console.log('[TimerEffect] Running. Deps:', { isTranscriptRequest, isPollingProgress, isLoading, dataStatus: data?.status, dataProgress: data?.progress, error, timerStartTime });
+    console.log('[TimerEffect] Running. Deps:', { isTranscriptRequest, isPollingProgress, isLoading, dataStatus: data?.status, dataProgress: data?.progress, error, timerStartTime, elapsedTime });
     let timerInterval: NodeJS.Timeout;
     const shouldRunTimer = isTranscriptRequest && (isPollingProgress || (isLoading && !data?.progress && !error));
     console.log('[TimerEffect] shouldRunTimer:', shouldRunTimer);
@@ -155,7 +155,7 @@ export const ProcessSidebar: React.FC<ProcessSidebarProps> = ({
       console.log('[TimerEffect] Cleanup: Clearing interval.');
       clearInterval(timerInterval);
     };
-  }, [isTranscriptRequest, isPollingProgress, isLoading, data?.status, data?.progress, error, timerStartTime]); // Added data.status to deps for more precise reaction to polling changes
+  }, [isTranscriptRequest, isPollingProgress, isLoading, data?.status, data?.progress, error, timerStartTime, elapsedTime]); // Added elapsedTime
 
 
   const formatTime = (ms: number): string => {

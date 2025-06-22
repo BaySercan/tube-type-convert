@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { useParams, useLocation } from 'react-router-dom';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
@@ -26,7 +26,10 @@ const ResultPage: React.FC = () => {
 
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  const fetchProgress = async () => {
+  // Forward declaration for fetchResult to satisfy ESLint in fetchProgress's useCallback
+  const fetchResultRef = useRef<() => Promise<void>>();
+
+  const fetchProgress = useCallback(async () => {
     if (!jobId) return;
     try {
       const data: ProgressResponse = await getProcessingProgress(jobId);
@@ -39,7 +42,9 @@ const ResultPage: React.FC = () => {
         }
         setIsLoading(false); // Stop general loading once progress polling is done
         if (data.status === 'completed' || data.progress === 100) { // Check for completion
-          fetchResult();
+          if (fetchResultRef.current) {
+            fetchResultRef.current();
+          }
         } else if (data.status === 'failed') {
           setError(`Job failed: ${data.status}`);
         }
@@ -52,9 +57,9 @@ const ResultPage: React.FC = () => {
       }
       setIsLoading(false);
     }
-  };
+  }, [jobId]);
 
-  const fetchResult = async () => {
+  const fetchResult = useCallback(async () => {
     if (!jobId) return;
     console.log('Fetching final result...');
     setIsLoading(true); // Indicate loading for the result fetching phase
@@ -79,7 +84,12 @@ const ResultPage: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [jobId]);
+
+  // Assign fetchResult to the ref after its definition
+  useEffect(() => {
+    fetchResultRef.current = fetchResult;
+  }, [fetchResult]);
 
   useEffect(() => {
     if (jobId) {
@@ -92,7 +102,7 @@ const ResultPage: React.FC = () => {
         clearInterval(intervalRef.current);
       }
     };
-  }, [jobId]);
+  }, [jobId, fetchProgress]);
 
   return (
     <div className="min-h-screen w-full flex flex-col bg-gradient-to-br from-gray-900 via-slate-900 to-zinc-900 text-white">

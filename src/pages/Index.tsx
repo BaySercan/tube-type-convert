@@ -23,6 +23,7 @@ import {
 
 // Imports from DashboardPage
 import { ProcessSidebar } from "@/components/ProcessSidebar";
+import type { SidebarData as ProcessSidebarData } from "@/components/ProcessSidebar"; // Import SidebarData type
 import * as videoApi from '@/lib/videoApi';
 import { StillProcessingError } from '@/lib/videoApi'; // Import the custom error
 import type { AsyncJobResponse, TranscriptResponse, ProgressResponse } from '@/lib/videoApi'; // Import types
@@ -271,14 +272,15 @@ const Index = () => {
       console.log(`[IndexPage] Polling progress for ${currentProcessingId}`);
       const progress = await videoApi.getProcessingProgress(currentProcessingId);
       setSidebarData(prevData => ({
-        ...(typeof prevData === 'object' ? prevData : {}),
+        ...prevData, // Spread existing data first
         status: progress.status,
         progress: progress.progress,
         video_title: progress.video_title,
         lastUpdated: new Date().toLocaleTimeString(),
         message: `Status: ${progress.status}, Progress: ${progress.progress}%`,
         jobId: progress.id, // Ensure jobId is in sidebarData for result query
-        originalUrl: (prevData as any)?.originalUrl || url,
+        // originalUrl will be preserved if already in prevData, or set initially when transcriptMutation runs
+        originalUrl: prevData?.originalUrl || url, // Ensure originalUrl is maintained or set
       }));
       setErrorForSidebar(null);
 
@@ -315,12 +317,16 @@ const Index = () => {
     },
     refetchIntervalInBackground: true,
     refetchOnWindowFocus: false,
-    onError: (err) => {
-      console.error(`[IndexPage] Error polling progress for ${currentProcessingId}:`, err);
-      setErrorForSidebar(err.message || "Error fetching progress.");
+    // onError callback removed, will be handled by useEffect
+  });
+
+  useEffect(() => {
+    if (progressError) {
+      console.error(`[IndexPage] Error polling progress for ${currentProcessingId}:`, progressError);
+      setErrorForSidebar(progressError.message || "Error fetching progress.");
       // Consider stopping polling on certain errors by setCurrentProcessingId(null)
     }
-  });
+  }, [progressError, currentProcessingId]);
 
   // --- Query for Fetching Final Result ---
   const { data: resultData, error: resultError, isLoading: isResultLoading, isFetching: isResultFetching } = useQuery<TranscriptResponse, Error>({
@@ -352,58 +358,60 @@ const Index = () => {
         }
         return attemptIndex * 1000; // Standard backoff for other errors
     },
-    onSuccess: (data) => {
-      // console.log(`[IndexPage] Result fetched successfully for ${jobIdForResults}. Raw data:`, JSON.parse(JSON.stringify(data))); // Debug log removed
+    // onSuccess and onError callbacks removed, will be handled by useEffect
+  });
 
-      // Clean the data for final display
-      const finalResultData = {
-        // Core transcript fields from TranscriptResponse
-        success: data.success,
-        title: data.title,
-        language: data.language,
-        transcript: data.transcript,
-        ai_notes: data.ai_notes,
-        isProcessed: data.isProcessed,
-        processor: data.processor,
-        video_id: data.video_id,
-        channel_id: data.channel_id,
-        channel_name: data.channel_name,
-        post_date: data.post_date,
-        // Add any other fields that are part of the actual result and not metadata for polling/UI state
-        status: "final_result_displayed", // Explicit status for final display
-        // Ensure no progress, message (from polling), or processingId fields overwrite this
+  useEffect(() => {
+    if (resultData) {
+      // console.log(`[IndexPage] Result fetched successfully for ${jobIdForResults}. Raw data:`, JSON.parse(JSON.stringify(resultData)));
+      const finalResultData: ProcessSidebarData = {
+        success: resultData.success,
+        title: resultData.title,
+        language: resultData.language,
+        transcript: resultData.transcript,
+        ai_notes: resultData.ai_notes,
+        isProcessed: resultData.isProcessed,
+        processor: resultData.processor,
+        video_id: resultData.video_id,
+        channel_id: resultData.channel_id,
+        channel_name: resultData.channel_name,
+        post_date: resultData.post_date,
+        status: "final_result_displayed",
       };
-
-      // console.log('[IndexPage] Setting cleaned finalResultData to sidebar:', JSON.parse(JSON.stringify(finalResultData))); // Debug log removed
+      // console.log('[IndexPage] Setting cleaned finalResultData to sidebar:', JSON.parse(JSON.stringify(finalResultData)));
       setSidebarTitle("Transcript Result");
       setSidebarData(finalResultData);
       setErrorForSidebar(null);
-      setJobIdForResults(null); // Clear to prevent re-fetching unless explicitly triggered
-      queryClient.invalidateQueries({ queryKey: ['result', jobIdForResults] }); // Clean up this query's cache
-    },
-    onError: (error) => {
-      console.error(`[IndexPage] Error fetching result for ${jobIdForResults}:`, error);
-      if (!(error instanceof StillProcessingError)) { // Don't show final error for StillProcessingError as it's a retry state
+      setJobIdForResults(null);
+      if (jobIdForResults) { // Ensure jobIdForResults is not null before invalidating
+        queryClient.invalidateQueries({ queryKey: ['result', jobIdForResults] });
+      }
+    }
+  }, [resultData, jobIdForResults, queryClient]);
+
+  useEffect(() => {
+    if (resultError) {
+      console.error(`[IndexPage] Error fetching result for ${jobIdForResults}:`, resultError);
+      if (!(resultError instanceof StillProcessingError)) {
         setSidebarTitle("Error Fetching Result");
-        setErrorForSidebar(error.message || "Failed to get final result.");
+        setErrorForSidebar(resultError.message || "Failed to get final result.");
         setSidebarData(prevData => ({
           ...(typeof prevData === 'object' ? prevData : {}),
           status: "result_error",
-          message: `Failed to retrieve result: ${error.message}`,
+          message: `Failed to retrieve result: ${resultError.message}`,
         }));
       } else {
-        // If StillProcessingError persists after retries, treat as a final error
         setSidebarTitle("Error Fetching Result");
-        setErrorForSidebar(`Result not available after multiple retries. Last status: ${error.status}, Progress: ${error.progress}%`);
-         setSidebarData(prevData => ({
-            ...(typeof prevData === 'object' ? prevData : {}),
-            status: "result_error_timeout",
-            message: `Result not available after multiple retries. Last status: ${error.status}, Progress: ${error.progress}%`,
+        setErrorForSidebar(`Result not available after multiple retries. Last status: ${resultError.status}, Progress: ${resultError.progress}%`);
+        setSidebarData(prevData => ({
+          ...(typeof prevData === 'object' ? prevData : {}),
+          status: "result_error_timeout",
+          message: `Result not available after multiple retries. Last status: ${resultError.status}, Progress: ${resultError.progress}%`,
         }));
       }
       // setJobIdForResults(null); // Optionally clear to stop further attempts on final error
-    },
-  });
+    }
+  }, [resultError, jobIdForResults]);
 
 
   const isProcessing = isAnyMutationPending || isPollingActive || isResultLoading || isResultFetching;
@@ -423,10 +431,10 @@ const Index = () => {
       if (activeBlobUrl) {
         console.log('[IndexPage] Unmounting or new process, revoking active blob URL:', activeBlobUrl);
         URL.revokeObjectURL(activeBlobUrl);
-        setActiveBlobUrl(null);
+        // setActiveBlobUrl(null); // Avoid setting state in cleanup if it causes loops; primary setActiveBlobUrl(null) calls are elsewhere
       }
     };
-  }, []); // Empty dependency array means this runs on mount and cleans up on unmount
+  }, [activeBlobUrl]); // Added activeBlobUrl to dependency array
 
   const handleProcess = () => {
     // Clear previous polling/result states if a new process is started
