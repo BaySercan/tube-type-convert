@@ -54,10 +54,10 @@ const Navbar = () => {
             <FileText className="w-4 h-4" />
             <span>Docs</span>
           </Link>
-          <a href="#pricing" className="flex items-center space-x-2 text-gray-300 hover:text-white transition-colors">
+          <Link to="/#pricing" className="flex items-center space-x-2 text-gray-300 hover:text-white transition-colors">
             <DollarSign className="w-4 h-4" />
             <span>Pricing</span>
-          </a>
+          </Link>
           {/* {user && ( // Only show Dashboard link if user is logged in
             <Link to="/dashboard" className="flex items-center space-x-2 text-gray-300 hover:text-white transition-colors">
               // Optionally add an icon e.g. <LayoutDashboard className="w-4 h-4" />

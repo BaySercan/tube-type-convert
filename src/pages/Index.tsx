@@ -734,6 +734,59 @@ const Index = () => {
         </Button>
       )}
 
+      {/* Pricing Section Placeholder */}
+      <div id="pricing" className="py-16 bg-gray-800/10">
+        <div className="max-w-4xl mx-auto px-4 text-center">
+          <h2 className="text-3xl font-bold text-gray-100 mb-4">Pricing</h2>
+          <p className="text-gray-300 text-lg mb-8">
+            Detailed pricing information will be available here soon.
+          </p>
+          {/* Placeholder for pricing cards or table */}
+          <div className="grid md:grid-cols-3 gap-8">
+            <Card className="bg-gray-700/30 border-gray-600/50 text-gray-100">
+              <CardHeader>
+                <CardTitle>Free Tier</CardTitle>
+                <CardDescription className="text-gray-400">Basic access</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <p className="text-2xl font-bold">$0<span className="text-sm text-gray-400">/month</span></p>
+                <ul className="mt-4 space-y-2 text-gray-300">
+                  <li>Feature 1</li>
+                  <li>Feature 2</li>
+                </ul>
+              </CardContent>
+            </Card>
+            <Card className="bg-gray-700/30 border-gray-600/50 text-gray-100">
+              <CardHeader>
+                <CardTitle>Pro Tier</CardTitle>
+                <CardDescription className="text-gray-400">More features</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <p className="text-2xl font-bold">$10<span className="text-sm text-gray-400">/month</span></p>
+                <ul className="mt-4 space-y-2 text-gray-300">
+                  <li>Feature 1</li>
+                  <li>Feature 2</li>
+                  <li>Feature 3</li>
+                </ul>
+              </CardContent>
+            </Card>
+            <Card className="bg-gray-700/30 border-gray-600/50 text-gray-100">
+              <CardHeader>
+                <CardTitle>Enterprise Tier</CardTitle>
+                <CardDescription className="text-gray-400">Custom solutions</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <p className="text-2xl font-bold">Contact Us</p>
+                <ul className="mt-4 space-y-2 text-gray-300">
+                  <li>All Pro Features</li>
+                  <li>Dedicated Support</li>
+                </ul>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </div>
+
       <Footer />
     </div>
   );
