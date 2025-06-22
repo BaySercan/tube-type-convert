@@ -225,7 +225,7 @@ export const ProcessSidebar: React.FC<ProcessSidebarProps> = ({
           </div>
         </div>
 
-        <ScrollArea className="flex-grow pr-6">
+        <ScrollArea className="flex-grow">
           {/* AI Transcript Warning */}
           {isTranscriptRequest && (isPollingProgress || (isLoading && !data?.progress && !error)) && (
             <div className="p-3 border border-sky-600 bg-sky-900/60 rounded-md text-sky-100 text-xs shadow w-full mb-4"> {/* Changed to sky theme, removed my-2, added w-full */}
