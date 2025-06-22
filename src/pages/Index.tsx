@@ -349,7 +349,7 @@ const Index = () => {
           progress: error.progress,
           message: `Result finalization is taking a bit longer. Status: ${error.status}, Progress: ${error.progress}%. Waiting...`,
         }));
-        return failureCount < 5; // Retry up to 5 times for StillProcessingError
+        return failureCount < 10; // Increased retries to 10 for StillProcessingError
       }
       return failureCount < 2; // Default retry for other errors (e.g., network issues)
     },
