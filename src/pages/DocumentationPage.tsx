@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { Youtube, Music, Video, FileText, Info, Settings, Zap, HelpCircle, ChevronRight, Menu, X } from 'lucide-react';
-import { useMediaQuery } from '@/hooks/use-mobile'; // Assuming you have a hook like this
+import { useIsMobile } from '@/hooks/use-mobile';
 
 const documentationSections = [
   { id: 'introduction', title: '👋 Welcome!', icon: Zap },
@@ -23,7 +23,7 @@ const DocumentationPage: React.FC = () => {
   const [activeSection, setActiveSection] = useState<string>('introduction');
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState<boolean>(false);
   const contentRefs = useRef<Record<string, HTMLDivElement | null>>({});
-  const isMobile = useMediaQuery('(max-width: 768px)');
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     const observer = new IntersectionObserver(
