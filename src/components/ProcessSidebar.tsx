@@ -44,6 +44,7 @@ export interface SidebarData { // Added export keyword
   // Can also hold the final TranscriptResponse or other direct results
   // For simplicity, ReactJson will handle arbitrary other properties.
   // We'll try to render specific UI for the above, and fallback to ReactJson for the rest.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   [key: string]: any; // Allow other properties for the final JSON data
 }
 
