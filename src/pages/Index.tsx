@@ -24,7 +24,8 @@ import {
 // Imports from DashboardPage
 import { ProcessSidebar } from "@/components/ProcessSidebar";
 import * as videoApi from '@/lib/videoApi';
-import type { AsyncJobResponse, TranscriptResponse } from '@/lib/videoApi'; // Import types
+import { StillProcessingError } from '@/lib/videoApi'; // Import the custom error
+import type { AsyncJobResponse, TranscriptResponse, ProgressResponse } from '@/lib/videoApi'; // Import types
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'; // Added useQuery
 
 
@@ -259,101 +260,144 @@ const Index = () => {
   // isProcessing should be true if any mutation is pending OR if we are actively polling.
   const isAnyMutationPending = infoMutation.isPending || downloadFileMutation.isPending || transcriptMutation.isPending;
   const isPollingActive = !!currentProcessingId;
+  const [jobIdForResults, setJobIdForResults] = useState<string | null>(null);
 
-  const isProcessing = isAnyMutationPending || isPollingActive;
-  // Sidebar loading should be true if a mutation is pending, or if polling is active and we don't have final data yet.
-  // The 'sidebarData' might already show "processing..." from the AsyncJobResponse,
-  // so isSidebarLoading might primarily reflect the initial mutation call.
-  // Let's refine this: sidebar should show its own loading state based on what it's displaying.
-  // ProcessSidebar already has an isLoading prop. We need to pass it correctly.
-  // If currentProcessingId is set, and we don't have a final result, it's loading.
-  // If a mutation is pending, it's loading.
 
-  const { data: progressData, error: progressError, isLoading: isProgressLoading, refetch: refetchProgress } = useQuery({
+  // --- Query for Polling Progress ---
+  const { data: progressData, error: progressError, isLoading: isProgressLoading } = useQuery<ProgressResponse | null, Error>({
     queryKey: ['progress', currentProcessingId],
     queryFn: async () => {
       if (!currentProcessingId) return null;
       console.log(`[IndexPage] Polling progress for ${currentProcessingId}`);
-      try {
-        const progress = await videoApi.getProcessingProgress(currentProcessingId);
-        setSidebarData(prevData => ({
-          ...(typeof prevData === 'object' ? prevData : {}), // Preserve existing sidebar data (like endpoints)
-          status: progress.status,
-          progress: progress.progress,
-          video_title: progress.video_title, // Add video title if available
-          lastUpdated: new Date().toLocaleTimeString(),
-          message: `Status: ${progress.status}, Progress: ${progress.progress}%`,
-          originalUrl: (prevData as any)?.originalUrl || url, // Preserve or add originalUrl
-        }));
-        setErrorForSidebar(null);
+      const progress = await videoApi.getProcessingProgress(currentProcessingId);
+      setSidebarData(prevData => ({
+        ...(typeof prevData === 'object' ? prevData : {}),
+        status: progress.status,
+        progress: progress.progress,
+        video_title: progress.video_title,
+        lastUpdated: new Date().toLocaleTimeString(),
+        message: `Status: ${progress.status}, Progress: ${progress.progress}%`,
+        jobId: progress.id, // Ensure jobId is in sidebarData for result query
+        originalUrl: (prevData as any)?.originalUrl || url,
+      }));
+      setErrorForSidebar(null);
 
-        if (progress.status === 'completed' || progress.status === 'failed' || progress.progress === 100) {
-          console.log(`[IndexPage] Progress complete or failed for ${currentProcessingId}. Status: ${progress.status}`);
-          setCurrentProcessingId(null); // Stop polling progress
-          queryClient.invalidateQueries({ queryKey: ['progress', currentProcessingId] }); // Stop this query
+      if (progress.status === 'completed' || progress.status === 'failed' || progress.progress === 100) {
+        console.log(`[IndexPage] Progress for ${currentProcessingId} is ${progress.status} at ${progress.progress}%.`);
+        // Stop this progress query
+        queryClient.invalidateQueries({ queryKey: ['progress', currentProcessingId] });
 
-          if (progress.status === 'completed' || progress.progress === 100) {
-            // Fetch final result
-            setSidebarTitle("Fetching Final Result...");
-            // Consider using a mutation for fetching result for better loading/error states
-            videoApi.getProcessingResult(progress.id)
-              .then(result => {
-                setSidebarTitle("Transcript Result");
-                setSidebarData(result); // This should be the TranscriptResponse
-                setErrorForSidebar(null);
-              })
-              .catch(err => {
-                console.error(`[IndexPage] Error fetching result for ${progress.id}:`, err);
-                setSidebarTitle("Error Fetching Result");
-                setErrorForSidebar(err.message || "Failed to get final result.");
-                setSidebarData(prevData => ({
-                    ...(typeof prevData === 'object' ? prevData : {}),
-                    status: "result_error",
-                }));
-              });
-          } else { // Failed status
-             setSidebarTitle("Processing Failed");
-             setErrorForSidebar(`Processing failed with status: ${progress.status}`);
-             setSidebarData(prevData => ({
-                ...(typeof prevData === 'object' ? prevData : {}),
-                status: "processing_failed",
-                message: `Error: Processing failed. Status: ${progress.status}`,
-             }));
-          }
+        if (progress.status === 'completed' || (progress.status !== 'failed' && progress.progress === 100)) {
+          setSidebarTitle("Finalizing Result...");
+          setSidebarData(prev => ({ ...prev, status: "finalizing", message: "Progress complete. Fetching final result..."}));
+          setJobIdForResults(currentProcessingId); // Enable result query
+        } else { // Failed status from progress
+          setSidebarTitle("Processing Failed");
+          setErrorForSidebar(`Processing failed with status: ${progress.status}`);
+          setSidebarData(prevData => ({
+            ...(typeof prevData === 'object' ? prevData : {}),
+            status: "processing_failed",
+            message: `Error: Processing failed. Status: ${progress.status}`,
+          }));
         }
-        return progress;
-      } catch (err: any) {
-        console.error(`[IndexPage] Error polling progress for ${currentProcessingId}:`, err);
-        setErrorForSidebar(err.message || "Error fetching progress.");
-        // Optionally stop polling on certain errors
-        // setCurrentProcessingId(null);
-        // queryClient.invalidateQueries({ queryKey: ['progress', currentProcessingId] });
-        throw err; // Re-throw to let React Query handle it
+        setCurrentProcessingId(null); // Clear currentProcessingId to stop this query's refetch interval
       }
+      return progress;
     },
-    enabled: !!currentProcessingId, // Only run query if currentProcessingId is set
-    refetchInterval: (query) => { // Custom refetch interval logic
-      if (!currentProcessingId) return false; // Stop polling if no ID
-      const data = query.state.data as videoApi.ProgressResponse | null;
-      if (data && (data.status === 'completed' || data.status === 'failed' || data.progress === 100)) {
-        return false; // Stop polling if complete, failed, or 100%
+    enabled: !!currentProcessingId,
+    refetchInterval: (query) => {
+      // Check if query.state.data exists and is of type ProgressResponse
+      const data = query.state.data as ProgressResponse | null;
+      if (!currentProcessingId || (data && (data.status === 'completed' || data.status === 'failed' || data.progress === 100))) {
+        return false; // Stop polling
       }
       return 5000; // Poll every 5 seconds
     },
     refetchIntervalInBackground: true,
-    refetchOnWindowFocus: false, // Avoid refetching just on window focus if polling
+    refetchOnWindowFocus: false,
+    onError: (err) => {
+      console.error(`[IndexPage] Error polling progress for ${currentProcessingId}:`, err);
+      setErrorForSidebar(err.message || "Error fetching progress.");
+      // Consider stopping polling on certain errors by setCurrentProcessingId(null)
+    }
   });
 
-  useEffect(() => {
-    if (progressError) {
-      console.error("[IndexPage] Progress polling error:", progressError);
-      // setErrorForSidebar(progressError.message || "Error fetching progress.");
-      // Decide if we should stop polling on error. For now, React Query will retry.
-    }
-  }, [progressError]);
+  // --- Query for Fetching Final Result ---
+  const { data: resultData, error: resultError, isLoading: isResultLoading, isFetching: isResultFetching } = useQuery<TranscriptResponse, Error>({
+    queryKey: ['result', jobIdForResults],
+    queryFn: async () => {
+      if (!jobIdForResults) throw new Error("Job ID for result is missing.");
+      console.log(`[IndexPage] Fetching result for ${jobIdForResults}`);
+      setSidebarTitle("Fetching Final Result...");
+      setSidebarData(prev => ({ ...prev, status: "fetching_result", message: "Fetching final result details..."}));
+      return videoApi.getProcessingResult(jobIdForResults);
+    },
+    enabled: !!jobIdForResults,
+    retry: (failureCount, error) => {
+      if (error instanceof StillProcessingError) {
+        console.log(`[IndexPage] Result for ${jobIdForResults} still processing (Attempt ${failureCount + 1}). Status: ${error.status}, Progress: ${error.progress}. Retrying...`);
+        setSidebarData(prev => ({
+          ...prev,
+          status: error.status || "finalizing_still",
+          progress: error.progress,
+          message: `Result finalization is taking a bit longer. Status: ${error.status}, Progress: ${error.progress}%. Waiting...`,
+        }));
+        return failureCount < 5; // Retry up to 5 times for StillProcessingError
+      }
+      return failureCount < 2; // Default retry for other errors (e.g., network issues)
+    },
+    retryDelay: (attemptIndex, error) => {
+        if (error instanceof StillProcessingError) {
+            return Math.min(attemptIndex * 2000, 10000); // e.g., 0s, 2s, 4s, 6s, 8s, up to 10s
+        }
+        return attemptIndex * 1000; // Standard backoff for other errors
+    },
+    onSuccess: (data) => {
+      console.log(`[IndexPage] Result fetched successfully for ${jobIdForResults}:`, data);
+      setSidebarTitle("Transcript Result");
+      setSidebarData(data); // This should be the final TranscriptResponse
+      setErrorForSidebar(null);
+      setJobIdForResults(null); // Clear to prevent re-fetching unless explicitly triggered
+      queryClient.invalidateQueries({ queryKey: ['result', jobIdForResults] }); // Clean up this query's cache
+    },
+    onError: (error) => {
+      console.error(`[IndexPage] Error fetching result for ${jobIdForResults}:`, error);
+      if (!(error instanceof StillProcessingError)) { // Don't show final error for StillProcessingError as it's a retry state
+        setSidebarTitle("Error Fetching Result");
+        setErrorForSidebar(error.message || "Failed to get final result.");
+        setSidebarData(prevData => ({
+          ...(typeof prevData === 'object' ? prevData : {}),
+          status: "result_error",
+          message: `Failed to retrieve result: ${error.message}`,
+        }));
+      } else {
+        // If StillProcessingError persists after retries, treat as a final error
+        setSidebarTitle("Error Fetching Result");
+        setErrorForSidebar(`Result not available after multiple retries. Last status: ${error.status}, Progress: ${error.progress}%`);
+         setSidebarData(prevData => ({
+            ...(typeof prevData === 'object' ? prevData : {}),
+            status: "result_error_timeout",
+            message: `Result not available after multiple retries. Last status: ${error.status}, Progress: ${error.progress}%`,
+        }));
+      }
+      // setJobIdForResults(null); // Optionally clear to stop further attempts on final error
+    },
+  });
 
-  // Effect to cleanup blob URL on component unmount or when currentProcessingId changes (new process)
+
+  const isProcessing = isAnyMutationPending || isPollingActive || isResultLoading || isResultFetching;
+  // More refined sidebar loading state
+  const isSidebarLoading =
+    infoMutation.isPending ||
+    downloadFileMutation.isPending ||
+    transcriptMutation.isPending ||
+    (isPollingActive && isProgressLoading && !progressData) || // Loading progress initially
+    (!!jobIdForResults && (isResultLoading || isResultFetching) && !resultData); // Loading result initially or during retries
+
+
   useEffect(() => {
+    // This effect is primarily for cleaning up blob URLs.
+    // Error display for progress and result queries is handled by their respective onError callbacks.
     return () => {
       if (activeBlobUrl) {
         console.log('[IndexPage] Unmounting or new process, revoking active blob URL:', activeBlobUrl);
@@ -363,13 +407,12 @@ const Index = () => {
     };
   }, []); // Empty dependency array means this runs on mount and cleans up on unmount
 
-  const isSidebarLoading = isAnyMutationPending || (isPollingActive && isProgressLoading) || (isPollingActive && !sidebarData);
-
-
   const handleProcess = () => {
-    // Clear previous polling state if a new process is started
+    // Clear previous polling/result states if a new process is started
     setCurrentProcessingId(null);
-    queryClient.removeQueries({ queryKey: ['progress'] }); // Clear old progress queries
+    setJobIdForResults(null);
+    queryClient.removeQueries({ queryKey: ['progress'] });
+    queryClient.removeQueries({ queryKey: ['result'] });
 
     // Revoke any existing blob URL when a new process starts
     if (activeBlobUrl) {
