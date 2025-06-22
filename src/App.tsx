@@ -11,6 +11,7 @@ import ProtectedRoute from "@/components/ProtectedRoute"; // Import ProtectedRou
 import DashboardPage from "@/pages/DashboardPage"; // Import DashboardPage (using DashboardPageWithAuth as default export)
 import ProgressPage from "./pages/ProgressPage"; // Import ProgressPage
 import ResultPage from "./pages/ResultPage"; // Import ResultPage
+import DocumentationPage from "./pages/DocumentationPage"; // Import DocumentationPage
 
 const queryClient = new QueryClient();
 
@@ -25,6 +26,7 @@ const App = () => (
             {/* Public routes */}
             <Route path="/" element={<Index />} />
             <Route path="/login" element={<LoginPage />} /> {/* Add LoginPage route */}
+            <Route path="/documentation" element={<DocumentationPage />} /> {/* Add DocumentationPage route */}
             <Route path="/progress/:jobId" element={<ProgressPage />} /> {/* Add ProgressPage route */}
             <Route path="/result/:jobId" element={<ResultPage />} /> {/* Add ResultPage route */}
 

@@ -50,10 +50,10 @@ const Navbar = () => {
 
         {/* Navigation Links */}
         <div className="hidden md:flex items-center space-x-8">
-          <a href="#docs" className="flex items-center space-x-2 text-gray-300 hover:text-white transition-colors">
+          <Link to="/documentation" className="flex items-center space-x-2 text-gray-300 hover:text-white transition-colors">
             <FileText className="w-4 h-4" />
             <span>Docs</span>
-          </a>
+          </Link>
           <a href="#pricing" className="flex items-center space-x-2 text-gray-300 hover:text-white transition-colors">
             <DollarSign className="w-4 h-4" />
             <span>Pricing</span>
