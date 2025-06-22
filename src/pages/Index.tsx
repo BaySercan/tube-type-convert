@@ -189,8 +189,9 @@ const Index = () => {
   });
 
   // Type guard to check if response is AsyncJobResponse
-  function isAsyncJobResponse(response: any): response is AsyncJobResponse {
-    return response && typeof response.processingId === 'string';
+  function isAsyncJobResponse(response: unknown): response is AsyncJobResponse {
+    // Check if response is an object and has processingId property
+    return typeof response === 'object' && response !== null && 'processingId' in response && typeof (response as AsyncJobResponse).processingId === 'string';
   }
 
   // Define type for transcript mutation arguments
