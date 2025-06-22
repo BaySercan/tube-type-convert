@@ -44,7 +44,7 @@ const Index = () => {
 
   // State for ProcessSidebar (from DashboardPage)
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [sidebarData, setSidebarData] = useState<any | null>(null); // This will hold various data structures // Changed to any for flexibility
+  const [sidebarData, setSidebarData] = useState<ProcessSidebarData | null>(null); // Use imported ProcessSidebarData
   const [sidebarTitle, setSidebarTitle] = useState("Process Details");
   const [sidebarError, setErrorForSidebar] = useState<string | null>(null);
   const [showReopenButton, setShowReopenButton] = useState(true); // Initialize to true, as sidebar is initially closed

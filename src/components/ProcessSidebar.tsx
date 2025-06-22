@@ -13,11 +13,11 @@ import { Copy, ExternalLink, InfoIcon, AlertTriangleIcon, Download, Loader2 } fr
 import ReactJson from 'react-json-view';
 import { Progress } from "@/components/ui/progress";
 import { Link } from "react-router-dom"; // Import Link
-import React, { useState, useEffect } from 'react'; // Added useState and useEffect
+import React, { useState, useEffect, useMemo } from 'react'; // Added useMemo
 
 // Define a more specific type for the data prop
 // This helps in accessing properties safely
-interface SidebarData {
+export interface SidebarData { // Added export keyword
   // Properties from AsyncJobResponse (initial 202)
   processingId?: string;
   message?: string;       // Initial message or progress message
@@ -68,7 +68,7 @@ export const ProcessSidebar: React.FC<ProcessSidebarProps> = ({
   //   console.log('[ProcessSidebar] Props received:', { isOpen, title, data: JSON.parse(JSON.stringify(data)), isLoading, error });
   // }, [isOpen, title, data, isLoading, error]);
 
-  const funnyWaitingMessages = [
+  const funnyWaitingMessages = useMemo(() => [
     "Reticulating splines...",
     "Generating witty dialog...",
     "Swapping time and space...",
@@ -84,7 +84,7 @@ export const ProcessSidebar: React.FC<ProcessSidebarProps> = ({
     "Just counting to infinity, be right with you.",
     "Warming up the tubes...",
     "Polishing the pixels...",
-  ];
+  ], []);
 
   const [currentLoadingMessage, setCurrentLoadingMessage] = useState(funnyWaitingMessages[0]);
   const [timerStartTime, setTimerStartTime] = useState<number | null>(null);
