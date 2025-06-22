@@ -408,8 +408,8 @@ export const ProcessSidebar: React.FC<ProcessSidebarProps> = ({
           {showEmptyStateMessage && (
             <div className="flex flex-col items-center justify-center h-full text-center p-4">
               <InfoIcon className="h-12 w-12 text-gray-500 mb-4" />
-              <h3 className="text-lg font-semibold text-gray-100 mb-2">Sidebar Empty</h3> {/* text-gray-200 to text-gray-100 */}
-              <p className="text-sm text-gray-300"> {/* text-gray-400 to text-gray-300 */}
+              <h3 className="text-lg font-semibold text-gray-700 mb-2">Sidebar Empty</h3>
+              <p className="text-sm text-gray-500">
                 Start a process from the main page to see details and results here.
               </p>
             </div>
