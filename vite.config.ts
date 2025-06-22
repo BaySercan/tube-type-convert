@@ -20,6 +20,9 @@ export default defineConfig(({ mode }) => ({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  optimizeDeps: {
+    include: ['react-json-view'],
+  },
   test: {
     globals: true,
     environment: 'jsdom',
