@@ -353,9 +353,30 @@ const Index = () => {
         return attemptIndex * 1000; // Standard backoff for other errors
     },
     onSuccess: (data) => {
-      console.log(`[IndexPage] Result fetched successfully for ${jobIdForResults}:`, data);
+      // console.log(`[IndexPage] Result fetched successfully for ${jobIdForResults}. Raw data:`, JSON.parse(JSON.stringify(data))); // Debug log removed
+
+      // Clean the data for final display
+      const finalResultData = {
+        // Core transcript fields from TranscriptResponse
+        success: data.success,
+        title: data.title,
+        language: data.language,
+        transcript: data.transcript,
+        ai_notes: data.ai_notes,
+        isProcessed: data.isProcessed,
+        processor: data.processor,
+        video_id: data.video_id,
+        channel_id: data.channel_id,
+        channel_name: data.channel_name,
+        post_date: data.post_date,
+        // Add any other fields that are part of the actual result and not metadata for polling/UI state
+        status: "final_result_displayed", // Explicit status for final display
+        // Ensure no progress, message (from polling), or processingId fields overwrite this
+      };
+
+      // console.log('[IndexPage] Setting cleaned finalResultData to sidebar:', JSON.parse(JSON.stringify(finalResultData))); // Debug log removed
       setSidebarTitle("Transcript Result");
-      setSidebarData(data); // This should be the final TranscriptResponse
+      setSidebarData(finalResultData);
       setErrorForSidebar(null);
       setJobIdForResults(null); // Clear to prevent re-fetching unless explicitly triggered
       queryClient.invalidateQueries({ queryKey: ['result', jobIdForResults] }); // Clean up this query's cache

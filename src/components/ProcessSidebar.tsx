@@ -64,6 +64,9 @@ export const ProcessSidebar: React.FC<ProcessSidebarProps> = ({
   isLoading = false,
   error = null,
 }) => {
+  // useEffect(() => { // Debug log removed
+  //   console.log('[ProcessSidebar] Props received:', { isOpen, title, data: JSON.parse(JSON.stringify(data)), isLoading, error });
+  // }, [isOpen, title, data, isLoading, error]);
 
   const funnyWaitingMessages = [
     "Reticulating splines...",
@@ -90,8 +93,23 @@ export const ProcessSidebar: React.FC<ProcessSidebarProps> = ({
   // Moved constant declarations before useEffect hooks that depend on them
   const isFinalData = data && !data.processingId && !data.progressEndpoint && data.status !== 'processing_initiated' && typeof data.progress === 'undefined';
   const isAsyncJobInitial = data && data.processingId && data.status === 'processing_initiated';
-  const isPollingProgress = data && data.processingId && typeof data.progress === 'number' && data.status !== 'completed' && data.status !== 'failed' && data.status !== "result_error" && data.status !== "processing_failed";
+  const isPollingProgress = data && data.processingId && typeof data.progress === 'number' && data.status !== 'completed' && data.status !== 'failed' && data.status !== "result_error" && data.status !== "processing_failed" && data.status !== "final_result_displayed";
   const isTranscriptRequest = title.toLowerCase().includes("transcript");
+
+  // Log conditional variables
+  // useEffect(() => { // Debug log removed
+  //   const currentData = JSON.parse(JSON.stringify(data));
+  //   console.log('[ProcessSidebar] Conditional states:', {
+  //     data: currentData,
+  //     isFinalData,
+  //     isAsyncJobInitial,
+  //     isPollingProgress,
+  //     isTranscriptRequest,
+  //     isLoading,
+  //     hasJsonDataForViewer: Object.keys(jsonDataForViewer).length > 0, // Re-evaluate for logging context
+  //     title
+  //   });
+  // }, [data, isLoading, title, isFinalData, isAsyncJobInitial, isPollingProgress, isTranscriptRequest]); // jsonDataForViewer is not stable, so re-evaluate its check
 
   useEffect(() => {
     let messageInterval: NodeJS.Timeout;
