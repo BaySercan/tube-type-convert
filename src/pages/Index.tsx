@@ -693,14 +693,8 @@ const Index = () => {
                       </div>
                       <p className="text-xs text-gray-400 ml-7">Faster, but can be less predictable for some content.</p>
                     </RadioGroup>
-                    <p className="text-xs text-gray-400 mt-2">
-                      This option is hidden if "Skip AI Post-processing" is selected.
-                    </p>
                   </div>
                 )}
-                 <p className="text-xs text-gray-400 mt-3">
-                    Note: If "Skip AI" is checked, model selection has no effect.
-                  </p>
               </div>
             )}
 
