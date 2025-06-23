@@ -12,6 +12,7 @@ import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"; // Import RadioGroup
 import {
   Select,
   SelectContent,
@@ -40,7 +41,7 @@ const Index = () => {
   // State for AI Transcript options
   const [transcriptLang, setTranscriptLang] = useState('tr');
   const [transcriptSkipAI, setTranscriptSkipAI] = useState(false);
-  const [transcriptUseDeepSeek, setTranscriptUseDeepSeek] = useState(true);
+  const [aiModel, setAiModel] = useState('deepseek'); // New state for AI model
 
   // State for ProcessSidebar (from DashboardPage)
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -77,7 +78,7 @@ const Index = () => {
     if (selectedOutput !== 'transcript') {
       setTranscriptLang('tr');
       setTranscriptSkipAI(false);
-      setTranscriptUseDeepSeek(true);
+      setAiModel('deepseek'); // Reset AI model
     }
   }, [selectedOutput]);
 
@@ -199,7 +200,7 @@ const Index = () => {
     videoUrl: string;
     lang: string;
     skipAI: boolean;
-    useDeepSeek: boolean;
+  useDeepSeek: boolean; // Corrected: API expects a boolean for useDeepSeek
   };
 
   const transcriptMutation = useMutation<
@@ -209,7 +210,8 @@ const Index = () => {
   >({
     mutationFn: (args: TranscriptMutationArgs) => {
       console.log('[IndexPage] transcriptMutation.mutationFn called with args:', args);
-      return videoApi.getVideoTranscript(args.videoUrl, args.lang, args.skipAI, args.useDeepSeek);
+    // Call with useDeepSeek boolean, videoApi.ts handles conditional query param
+    return videoApi.getVideoTranscript(args.videoUrl, args.lang, args.skipAI, args.useDeepSeek);
     },
     onSuccess: (data, variables) => { // Added variables here
       console.log('[IndexPage] Transcript Mutation onSuccess:', data);
@@ -221,7 +223,8 @@ const Index = () => {
         originalUrl: variables.videoUrl,
         requestedLang: variables.lang,
         requestedSkipAI: variables.skipAI,
-        requestedUseDeepSeek: variables.useDeepSeek,
+        // requestedUseDeepSeek: variables.useDeepSeek, // This was for the boolean
+        requestedAiModel: aiModel, // Pass the string "deepseek" or "qwen" for display
       };
 
       if (isAsyncJobResponse(data)) {
@@ -253,7 +256,8 @@ const Index = () => {
         originalUrl: variables.videoUrl,
         requestedLang: variables.lang,
         requestedSkipAI: variables.skipAI,
-        requestedUseDeepSeek: variables.useDeepSeek,
+        // requestedUseDeepSeek: variables.useDeepSeek, // This was for the boolean
+        requestedAiModel: aiModel, // Pass the string "deepseek" or "qwen" for display
       });
     },
   });
@@ -371,7 +375,7 @@ const Index = () => {
           originalUrl: prevData?.originalUrl,
           requestedLang: prevData?.requestedLang,
           requestedSkipAI: prevData?.requestedSkipAI,
-          requestedUseDeepSeek: prevData?.requestedUseDeepSeek,
+            requestedAiModel: prevData?.requestedAiModel, // Persist AI model
           video_title: prevData?.video_title || resultData.title, // Prefer fresh title, fallback to previous
           lastUpdated: prevData?.lastUpdated, // Can keep lastUpdated from polling
         };
@@ -516,7 +520,10 @@ const Index = () => {
           videoUrl: url,
           lang: transcriptLang,
           skipAI: transcriptSkipAI,
-          useDeepSeek: transcriptUseDeepSeek,
+          // Determine the boolean for useDeepSeek based on aiModel state
+          // This boolean is passed to videoApi.getVideoTranscript
+          // videoApi.ts will handle not sending the param if skipAI is true
+          useDeepSeek: aiModel === 'deepseek',
         });
         break;
       default:
@@ -661,21 +668,38 @@ const Index = () => {
                   </Label>
                 </div>
 
-                {/* Use DeepSeek Checkbox */}
-                <div className="flex items-center space-x-3 pt-2">
-                  <Checkbox
-                    id="use-deepseek"
-                    checked={transcriptUseDeepSeek}
-                    onCheckedChange={(checked) => setTranscriptUseDeepSeek(checked as boolean)}
-                    disabled={isProcessing}
-                    className="border-gray-500 data-[state=checked]:bg-purple-500 data-[state=checked]:border-purple-500 focus-visible:ring-purple-400"
-                  />
-                  <Label htmlFor="use-deepseek" className="text-gray-300 font-medium cursor-pointer">
-                    Use DeepSeek Model (Advanced AI)
-                  </Label>
-                </div>
-                 <p className="text-xs text-gray-400 mt-2">
-                    Note: DeepSeek typically provides higher quality results but may take longer. Deselecting it might use a faster, alternative model if available. If "Skip AI" is checked, this option has no effect.
+                {/* AI Model Selection Radio Group */}
+                {!transcriptSkipAI && (
+                  <div className="space-y-3 pt-4">
+                    <Label className="text-gray-300 font-medium">Select AI Model</Label>
+                    <RadioGroup
+                      value={aiModel}
+                      onValueChange={setAiModel}
+                      className="space-y-2"
+                      disabled={isProcessing}
+                    >
+                      <div className="flex items-center space-x-3">
+                        <RadioGroupItem value="deepseek" id="deepseek-model" className="border-gray-500 data-[state=checked]:border-purple-500 data-[state=checked]:text-purple-500 focus-visible:ring-purple-400"/>
+                        <Label htmlFor="deepseek-model" className="text-gray-300 font-normal cursor-pointer">
+                          DeepSeek
+                        </Label>
+                      </div>
+                      <p className="text-xs text-gray-400 ml-7">Slower, but generally more stable and accurate results.</p>
+                      <div className="flex items-center space-x-3 pt-2">
+                        <RadioGroupItem value="qwen" id="qwen-model" className="border-gray-500 data-[state=checked]:border-teal-500 data-[state=checked]:text-teal-500 focus-visible:ring-teal-400"/>
+                        <Label htmlFor="qwen-model" className="text-gray-300 font-normal cursor-pointer">
+                          Qwen
+                        </Label>
+                      </div>
+                      <p className="text-xs text-gray-400 ml-7">Faster, but can be less predictable for some content.</p>
+                    </RadioGroup>
+                    <p className="text-xs text-gray-400 mt-2">
+                      This option is hidden if "Skip AI Post-processing" is selected.
+                    </p>
+                  </div>
+                )}
+                 <p className="text-xs text-gray-400 mt-3">
+                    Note: If "Skip AI" is checked, model selection has no effect.
                   </p>
               </div>
             )}

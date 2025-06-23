@@ -14,6 +14,7 @@ import ReactJson from 'react-json-view';
 import { Progress } from "@/components/ui/progress";
 import { Link } from "react-router-dom"; // Import Link
 import React, { useState, useEffect, useMemo } from 'react'; // Added useMemo
+import { getLanguageName } from "@/lib/utils"; // Import the new utility function
 
 // Define a more specific type for the data prop
 // This helps in accessing properties safely
@@ -28,7 +29,7 @@ export interface SidebarData { // Added export keyword
   // Transcript request parameters (to be displayed if present)
   requestedLang?: string;
   requestedSkipAI?: boolean;
-  requestedUseDeepSeek?: boolean;
+  requestedAiModel?: string; // Changed from requestedUseDeepSeek
 
   // Properties from ProgressResponse (polling)
   status?: string;        // e.g., "processing", "completed", "failed"
@@ -223,7 +224,7 @@ export const ProcessSidebar: React.FC<ProcessSidebarProps> = ({
       'processingId', 'message', 'progressEndpoint', 'resultEndpoint',
       'status', 'progress', 'video_title', 'lastUpdated',
       'mediaUrl', 'mediaType', 'fileName', // Exclude media player fields
-      'requestedLang', 'requestedSkipAI', 'requestedUseDeepSeek', 'originalUrl' // Exclude request params as they are displayed separately
+      'requestedLang', 'requestedSkipAI', 'requestedAiModel', 'originalUrl' // Exclude request params as they are displayed separately
     ].includes(key))
   ) : {};
   const hasJsonDataForViewer = Object.keys(jsonDataForViewer).length > 0;
@@ -272,20 +273,21 @@ export const ProcessSidebar: React.FC<ProcessSidebarProps> = ({
           )}
 
           {/* Display Transcript Request Parameters */}
-          {isTranscriptRequest && data && (typeof data.requestedLang !== 'undefined' || typeof data.requestedSkipAI !== 'undefined' || typeof data.requestedUseDeepSeek !== 'undefined') && (
+          {isTranscriptRequest && data && (typeof data.requestedLang !== 'undefined' || typeof data.requestedSkipAI !== 'undefined' || typeof data.requestedAiModel !== 'undefined') && (
             <div className="p-4 rounded-md bg-slate-700/80 text-slate-100 shadow-md w-full mb-4 border border-slate-600">
               <h4 className="font-semibold text-base text-slate-100 mb-3 pb-2 border-b border-slate-600">
                 Transcript Request Options
               </h4>
               <div className="space-y-2 text-sm">
                 {typeof data.requestedLang !== 'undefined' && (
-                  <p><strong>Language:</strong> <span className="text-slate-300">{data.requestedLang}</span></p>
+                  <p><strong>Language:</strong> <span className="text-slate-300">{getLanguageName(data.requestedLang)}</span></p>
                 )}
                 {typeof data.requestedSkipAI !== 'undefined' && (
                   <p><strong>Skip AI Post-processing:</strong> <span className="text-slate-300">{data.requestedSkipAI ? 'Yes' : 'No'}</span></p>
                 )}
-                {typeof data.requestedUseDeepSeek !== 'undefined' && (
-                  <p><strong>Use DeepSeek Model:</strong> <span className="text-slate-300">{data.requestedUseDeepSeek ? 'Yes' : 'No'}</span></p>
+                {/* Display AI Model only if Skip AI is false and model is present */}
+                {!data.requestedSkipAI && typeof data.requestedAiModel !== 'undefined' && data.requestedAiModel && (
+                  <p><strong>AI Model:</strong> <span className="text-slate-300">{data.requestedAiModel.charAt(0).toUpperCase() + data.requestedAiModel.slice(1)}</span></p>
                 )}
               </div>
             </div>

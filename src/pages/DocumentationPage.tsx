@@ -244,13 +244,18 @@ const DocumentationPage: React.FC = () => {
 
                   <div className="ml-8 space-y-3 mt-2">
                     <div className="p-3 bg-gray-700/30 rounded-md border border-gray-600/40">
-                      <p><strong>Language:</strong> Choose the primary language spoken in the video. This helps the AI accurately transcribe the content. We support several languages (e.g., Turkish, English, Spanish).</p>
+                      <p><strong>Language:</strong> Choose the primary language spoken in the video. This helps the AI accurately transcribe the content. We support several languages (e.g., Turkish, English, Spanish). The displayed language in the results will be its full name (e.g., "English" instead of "en").</p>
                     </div>
                     <div className="p-3 bg-gray-700/30 rounded-md border border-gray-600/40">
-                      <p><strong>Skip AI Post-processing:</strong> Check this if you want a raw, direct transcript without our AI's summarization or cleaning. Useful for specific linguistic analysis or if you prefer less interpretation.</p>
+                      <p><strong>Skip AI Post-processing:</strong> Check this if you want a raw, direct transcript without our AI's summarization or cleaning. Useful for specific linguistic analysis or if you prefer less interpretation. If selected, the AI Model choice below will be hidden and ignored.</p>
                     </div>
                     <div className="p-3 bg-gray-700/30 rounded-md border border-gray-600/40">
-                      <p><strong>Use DeepSeek Model:</strong> For potentially higher accuracy and more nuanced AI notes, keep this checked. Deselecting it might use a faster, alternative AI model if available, or it might have no effect if DeepSeek is the default/only advanced option. This option is ignored if "Skip AI" is checked.</p>
+                      <p><strong>AI Model Selection:</strong> If "Skip AI Post-processing" is NOT checked, you can choose between different AI models for transcription:</p>
+                      <ul className="list-disc list-inside pl-4 mt-2 space-y-1 text-gray-400">
+                        <li><strong>DeepSeek:</strong> Generally provides more stable and accurate results, but it may take a bit longer to process. Recommended for most use cases requiring high quality.</li>
+                        <li><strong>Qwen:</strong> Offers faster processing times. While good, it might be less predictable or consistent for certain types of audio or languages compared to DeepSeek.</li>
+                      </ul>
+                      <p className="mt-2">Select the model that best suits your needs for speed versus accuracy.</p>
                     </div>
                   </div>
 

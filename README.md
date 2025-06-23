@@ -9,12 +9,12 @@ This project is a frontend application for interacting with a YouTube Multi-API.
     *   **MP3 Audio Download**: Extract and download the audio from a YouTube video in MP3 format.
     *   **MP4 Video Download**: Download the YouTube video in MP4 format.
     *   **AI Transcript Generation**:
-        *   Supports multiple languages for transcription.
-        *   Option to get a plain transcript (skip AI post-processing).
-        *   Option to use advanced models like DeepSeek for higher quality results.
+        *   Supports multiple languages for transcription (displays full language names like "English" in results).
+        *   Option to get a plain transcript (skip AI post-processing). If selected, AI model choice is hidden.
+        *   Choice between AI models (e.g., DeepSeek for higher accuracy, Qwen for speed) when AI post-processing is active.
         *   Real-time progress updates for transcription jobs.
     *   **Video Information**: Fetch metadata about a YouTube video, including title, thumbnail, channel information, and post date.
-*   **Real-time Feedback**: A dynamic sidebar displays the progress of ongoing processes, results, and any errors encountered.
+*   **Real-time Feedback**: A dynamic sidebar displays the progress of ongoing processes, results (including selected AI model and full language names for transcripts), and any errors encountered.
 *   **Authentication**: Utilizes Supabase for user authentication (though core features are accessible on the main page).
 *   **API Interaction**: Communicates with a backend YouTube Multi-API (defined in `openapi.yaml`) for all processing tasks. Uses React Query for efficient data fetching, caching, and state management.
 

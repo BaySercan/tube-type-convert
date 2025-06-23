@@ -110,9 +110,16 @@ export const getVideoTranscript = async (
   const params = new URLSearchParams({
     url: videoUrl,
     lang,
-    skipAI: String(skipAI),
-    useDeepSeek: String(useDeepSeek),
   });
+
+  // Append skipAI parameter
+  params.append('skipAI', String(skipAI));
+
+  // Conditionally append useDeepSeek parameter only if skipAI is false
+  if (!skipAI) {
+    params.append('useDeepSeek', String(useDeepSeek));
+  }
+
   const response = await authenticatedFetch(`${API_BASE_URL}/transcript?${params.toString()}`);
 
   // If response is 202 Accepted, it's an async job
