@@ -127,36 +127,79 @@ export const ProcessSidebar: React.FC<ProcessSidebarProps> = ({
 
   // Timer effect for AI transcript
   useEffect(() => {
-    console.log('[TimerEffect] Running. Deps:', { isTranscriptRequest, isPollingProgress, isLoading, dataStatus: data?.status, dataProgress: data?.progress, error, timerStartTime, elapsedTime });
-    let timerInterval: NodeJS.Timeout;
+    let timerInterval: NodeJS.Timeout | undefined;
+
+    // Define when the timer should be actively running and counting
+    // Derived from existing component constants/props
     const shouldRunTimer = isTranscriptRequest && (isPollingProgress || (isLoading && !data?.progress && !error));
-    console.log('[TimerEffect] shouldRunTimer:', shouldRunTimer);
 
-    if (shouldRunTimer && timerStartTime === null) {
-      console.log('[TimerEffect] Starting timer.');
-      setTimerStartTime(Date.now());
-      setElapsedTime(0); // Reset elapsed time
+    console.log('[TimerEffect] Evaluating. shouldRunTimer:', shouldRunTimer, 'timerStartTime:', timerStartTime, 'data:', data, 'error:', error, 'isLoading:', isLoading);
+
+    if (shouldRunTimer) {
+      if (timerStartTime === null) {
+        // This is a new process or a restart after being stopped/reset
+        console.log('[TimerEffect] Starting or restarting timer.');
+        setTimerStartTime(Date.now());
+        setElapsedTime(0); // Explicitly reset elapsed time
+      }
+      // Set up the interval to update elapsed time
+      // timerStartTime will be non-null here due to the block above or previous renders if shouldRunTimer is true
+      if (timerStartTime !== null) { // Ensure timerStartTime is set before creating interval
+        timerInterval = setInterval(() => {
+          setElapsedTime(Date.now() - timerStartTime);
+        }, 1000);
+      } else if (timerStartTime === null && !(isLoading && !data?.progress && !error)) {
+        // This case can happen if isPollingProgress is true but timerStartTime was not set (e.g. loading initial state for an already running job)
+        // For this specific case, we should also start the timer.
+        // However, the (timerStartTime === null) block above should ideally catch this if 'isLoading' reflects the initial phase.
+        // For safety, if timerStartTime is still null but we are supposed to be running (especially for polling), initialize it.
+        // This might indicate a rapid state change or an edge case in how `isLoading` is managed externally.
+        console.log('[TimerEffect] Starting timer because shouldRunTimer is true but timerStartTime was null (polling scenario).');
+        setTimerStartTime(Date.now());
+        setElapsedTime(0);
+        // And set up the interval
+        timerInterval = setInterval(() => {
+          // Re-access timerStartTime from state in case it was set in this render pass by setTimerStartTime
+          // This requires timerStartTime to be a dependency or use the functional update form of setElapsedTime
+          setElapsedTime(prev => Date.now() - (timerStartTime || Date.now())); // Use current timerStartTime
+        }, 1000);
+      }
+    } else {
+      // Timer should not be running (not a transcript, or process ended/error)
+      if (timerStartTime !== null || elapsedTime !== 0) {
+        console.log('[TimerEffect] Stopping timer and resetting state because shouldRunTimer is false.');
+        setTimerStartTime(null);
+        setElapsedTime(0);
+      }
     }
-
-    if (shouldRunTimer && timerStartTime !== null) {
-      console.log('[TimerEffect] Setting up interval. Current elapsedTime:', elapsedTime);
-      timerInterval = setInterval(() => {
-        setElapsedTime(prevElapsedTime => Date.now() - timerStartTime);
-      }, 1000);
-    } else if (!shouldRunTimer && timerStartTime !== null) {
-      // If timer was running but should now stop
-      console.log('[TimerEffect] Stopping timer because shouldRunTimer is false.');
-      // setTimerStartTime(null); // Keep timerStartTime to display final time until new process
-                               // Or set to null if timer should disappear completely. Let's try keeping it for now.
-                               // If a new transcript process starts, the (shouldRunTimer && timerStartTime === null) condition will reset it.
-    }
-
 
     return () => {
-      console.log('[TimerEffect] Cleanup: Clearing interval.');
-      clearInterval(timerInterval);
+      if (timerInterval) {
+        console.log('[TimerEffect] Cleanup: Clearing interval.');
+        clearInterval(timerInterval);
+      }
     };
-  }, [isTranscriptRequest, isPollingProgress, isLoading, data?.status, data?.progress, error, timerStartTime, elapsedTime]); // Added elapsedTime
+  }, [
+    isTranscriptRequest,
+    isPollingProgress,
+    isLoading,
+    data, // Full data object as dependency
+    error,
+    timerStartTime, // timerStartTime state
+    // Removed data?.status, data?.progress as 'data' covers them.
+    // Removed elapsedTime from dependencies; it's set by the effect, not a trigger for it.
+  ]);
+
+  // Effect to reset timer when sidebar is explicitly closed
+  useEffect(() => {
+    if (!isOpen) {
+      console.log('[ProcessSidebar] Sidebar closed via isOpen prop. Resetting timer.');
+      if (timerStartTime !== null || elapsedTime !== 0) {
+          setTimerStartTime(null);
+          setElapsedTime(0);
+      }
+    }
+  }, [isOpen, timerStartTime, elapsedTime]);
 
 
   const formatTime = (ms: number): string => {
