@@ -190,17 +190,6 @@ export const ProcessSidebar: React.FC<ProcessSidebarProps> = ({
     // Removed elapsedTime from dependencies; it's set by the effect, not a trigger for it.
   ]);
 
-  // Effect to reset timer when sidebar is explicitly closed
-  useEffect(() => {
-    if (!isOpen) {
-      console.log('[ProcessSidebar] Sidebar closed via isOpen prop. Resetting timer.');
-      if (timerStartTime !== null || elapsedTime !== 0) {
-          setTimerStartTime(null);
-          setElapsedTime(0);
-      }
-    }
-  }, [isOpen, timerStartTime, elapsedTime]);
-
 
   const formatTime = (ms: number): string => {
     const totalSeconds = Math.floor(ms / 1000);
