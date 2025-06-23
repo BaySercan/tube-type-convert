@@ -594,22 +594,25 @@ const Index = () => {
                           <Sparkles className="w-4 h-4 text-white" />
                         </div>
                       )}
-                      <div className="flex items-start space-x-3">
+                      {/* Flex container for icon and text, responsive layout */}
+                      <div className="flex flex-col items-center space-y-2 md:flex-row md:items-start md:space-y-0 md:space-x-3 text-center md:text-left">
+                        {/* Icon container */}
                         <div className={`p-2 rounded-lg transition-colors ${
                           selectedOutput === option.id ? 'bg-rose-600' : 'bg-rose-700/60 group-hover:bg-rose-600/80'
                         }`}>
-                          <IconComponent className="w-5 h-5 text-gray-100" />
+                          <IconComponent className="w-6 h-6 md:w-5 md:h-5 text-gray-100" /> {/* Slightly larger icon on mobile */}
                         </div>
+                        {/* Text container */}
                         <div className="flex-1">
-                          <div className="flex items-center space-x-2">
-                            <h3 className="text-gray-100 font-semibold">{option.label}</h3>
+                          <div className="flex flex-col items-center md:flex-row md:items-center space-y-1 md:space-y-0 md:space-x-2">
+                            <h3 className="text-gray-100 font-semibold break-words">{option.label}</h3> {/* Added break-words for better wrapping */}
                             {option.isAI && (
                               <span className="text-xs bg-gradient-to-r from-blue-500 to-purple-600 text-white px-2 py-1 rounded-full font-medium">
                                 AI
                               </span>
                             )}
                           </div>
-                          <p className="text-gray-400 text-sm mt-1">{option.description}</p>
+                          <p className="text-gray-400 text-sm mt-1 break-words">{option.description}</p> {/* Added break-words for better wrapping */}
                         </div>
                       </div>
                     </button>
