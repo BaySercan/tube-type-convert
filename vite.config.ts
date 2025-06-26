@@ -21,7 +21,7 @@ export default defineConfig(({ mode }) => ({
     },
   },
   optimizeDeps: {
-    include: ['react-json-view'],
+    include: [],
   },
   test: {
     globals: true,

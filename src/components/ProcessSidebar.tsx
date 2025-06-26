@@ -10,7 +10,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Copy, ExternalLink, InfoIcon, AlertTriangleIcon, Download, Loader2 } from "lucide-react";
-import ReactJson from 'react-json-view';
+import JsonView from '@uiw/react-json-view';
+import { darkTheme } from '@uiw/react-json-view/dark';
 import { Progress } from "@/components/ui/progress";
 import { Link } from "react-router-dom"; // Import Link
 import React, { useState, useEffect, useMemo } from 'react'; // Added useMemo
@@ -305,15 +306,20 @@ export const ProcessSidebar: React.FC<ProcessSidebarProps> = ({
               >
                 <Copy className="h-4 w-4" />
               </Button>
-              <ReactJson
-                src={jsonDataForViewer}
-                theme="ocean" // Or your preferred theme
-                name={null} // Setting to null or false to remove the root "root" name
-                iconStyle="circle"
+              <JsonView
+                value={jsonDataForViewer}
                 displayObjectSize={true}
                 displayDataTypes={true}
-                enableClipboard={false} // Disable built-in copy feature as it's not working reliably
-                style={{ padding: '1rem', paddingTop: '2.5rem', backgroundColor: 'black' }} // Added paddingTop to avoid overlap with copy button
+                enableClipboard={false} // Disable built-in copy feature as a custom one is used
+                style={{
+                  ...darkTheme,
+                  padding: '1rem',
+                  paddingTop: '2.5rem', // To avoid overlap with the custom copy button
+                  // backgroundColor: 'black' // darkTheme should handle this
+                }}
+                // keyName={undefined} // Omitting keyName to avoid "root" if that's the default
+                // iconStyle: Not a direct prop, default triangles will be used.
+                // theme: Handled by merging darkTheme with custom styles.
               />
             </div>
           )}
