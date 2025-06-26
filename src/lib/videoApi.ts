@@ -48,6 +48,7 @@ export interface ProgressResponse { // Added export
   lastUpdated: string; // date-time
 }
 
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
 interface ResultResponse extends TranscriptResponse {
   // Assuming result is similar to transcript response for now
   // This might need adjustment based on actual API behavior for different job types

@@ -117,7 +117,7 @@ const ProgressPage: React.FC = () => {
                 <p className="text-green-300">Processing complete!</p>
                 <RouterLink
                   to={`/result/${jobId}`}
-                  state={{ videoUrl: state?.videoUrl || progressData?.original_url, videoTitle: displayVideoTitle }}
+                  state={{ videoUrl: state?.videoUrl || progressData?.video_id, videoTitle: displayVideoTitle }}
                   className="mt-2 inline-block text-blue-400 hover:underline"
                 >
                   View Result

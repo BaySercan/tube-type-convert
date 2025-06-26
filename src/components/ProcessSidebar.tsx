@@ -190,6 +190,7 @@ export const ProcessSidebar: React.FC<ProcessSidebarProps> = ({
     timerStartTime, // timerStartTime state
     // Removed data?.status, data?.progress as 'data' covers them.
     // Removed elapsedTime from dependencies; it's set by the effect, not a trigger for it.
+    elapsedTime
   ]);
 
 
@@ -310,7 +311,8 @@ export const ProcessSidebar: React.FC<ProcessSidebarProps> = ({
                 value={jsonDataForViewer}
                 displayObjectSize={true}
                 displayDataTypes={true}
-                enableClipboard={false} // Disable built-in copy feature as a custom one is used
+                enableClipboard={true} // Disable built-in copy feature as a custom one is used
+                collapsed={false} // Start expanded
                 style={{
                   ...darkTheme,
                   padding: '1rem',
@@ -318,7 +320,7 @@ export const ProcessSidebar: React.FC<ProcessSidebarProps> = ({
                   // backgroundColor: 'black' // darkTheme should handle this
                 }}
                 // keyName={undefined} // Omitting keyName to avoid "root" if that's the default
-                // iconStyle: Not a direct prop, default triangles will be used.
+                // iconStyle:  //Not a direct prop, default triangles will be used.
                 // theme: Handled by merging darkTheme with custom styles.
               />
             </div>
