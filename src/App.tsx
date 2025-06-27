@@ -8,7 +8,6 @@ import NotFound from "./pages/NotFound";
 import { AuthProvider } from "./contexts/AuthContext";
 import LoginPage from "./pages/LoginPage"; // Import LoginPage
 import ProtectedRoute from "@/components/ProtectedRoute"; // Import ProtectedRoute
-import DashboardPage from "@/pages/DashboardPage"; // Import DashboardPage (using DashboardPageWithAuth as default export)
 import ProgressPage from "./pages/ProgressPage"; // Import ProgressPage
 import ResultPage from "./pages/ResultPage"; // Import ResultPage
 import DocumentationPage from "./pages/DocumentationPage"; // Import DocumentationPage
@@ -27,12 +26,11 @@ const App = () => (
             <Route path="/" element={<Index />} />
             <Route path="/login" element={<LoginPage />} /> {/* Add LoginPage route */}
             <Route path="/documentation" element={<DocumentationPage />} /> {/* Add DocumentationPage route */}
-            <Route path="/progress/:jobId" element={<ProgressPage />} /> {/* Add ProgressPage route */}
-            <Route path="/result/:jobId" element={<ResultPage />} /> {/* Add ResultPage route */}
 
             {/* Protected routes */}
             <Route element={<ProtectedRoute />}>
-              <Route path="/dashboard" element={<DashboardPage />} />
+              <Route path="/progress/:jobId" element={<ProgressPage />} /> {/* Add ProgressPage route */}
+              <Route path="/result/:jobId" element={<ResultPage />} /> {/* Add ResultPage route */}
               {/* Add other protected routes here, e.g., <Route path="/profile" element={<ProfilePage />} /> */}
             </Route>
 

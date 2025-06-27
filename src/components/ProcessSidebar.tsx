@@ -256,7 +256,7 @@ export const ProcessSidebar: React.FC<ProcessSidebarProps> = ({
           <div className="flex items-center space-x-2">
             <AlertTriangleIcon className="h-5 w-5 text-red-300 flex-shrink-0" /> {/* Icon to match red theme */}
             <p>
-              <strong>Important:</strong> Results displayed here are temporary. Please save your data (copy JSON, download files) as it will be lost when you close this panel or start a new process.
+              <strong>Important:</strong> Results displayed here are temporary. Please save your data (copy JSON, download files) as it will be lost when you refresh or start a new process.
             </p>
           </div>
         </div>
@@ -312,7 +312,7 @@ export const ProcessSidebar: React.FC<ProcessSidebarProps> = ({
                 displayObjectSize={true}
                 displayDataTypes={true}
                 enableClipboard={true} // Disable built-in copy feature as a custom one is used
-                collapsed={false} // Start expanded
+                collapsed={true} // Start collapsed
                 style={{
                   ...darkTheme,
                   padding: '1rem',
