@@ -312,7 +312,7 @@ export const ProcessSidebar: React.FC<ProcessSidebarProps> = ({
                 displayObjectSize={true}
                 displayDataTypes={true}
                 enableClipboard={true} // Disable built-in copy feature as a custom one is used
-                collapsed={true} // Start collapsed
+                collapsed={false} // Start expanded
                 style={{
                   ...darkTheme,
                   padding: '1rem',
