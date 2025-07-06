@@ -320,7 +320,14 @@ export const ProcessSidebar: React.FC<ProcessSidebarProps> = ({ isOpen, onOpenCh
     renderCard("Result JSON", BrainCircuit, (
       <div className="relative rounded-md bg-slate-900/70 border border-slate-700 w-full overflow-hidden">
         <Button variant="ghost" size="icon" onClick={handleCopyJson} className="absolute top-2 right-2 text-slate-400 hover:text-white z-10" title="Copy JSON"><Copy className="h-4 w-4" /></Button>
-        <JsonView value={jsonDataForViewer} displayObjectSize displayDataTypes enableClipboard={false} collapsed={false} style={{...darkTheme, padding: '1rem', paddingTop: '2.5rem'}} />
+        <JsonView
+          value={jsonDataForViewer}
+          displayObjectSize
+          displayDataTypes
+          enableClipboard={false}
+          collapsed={data?.type === 'info' ? 1 : false} // Collapse 'info' type data by default
+          style={{...darkTheme, padding: '1rem', paddingTop: '2.5rem'}}
+        />
       </div>
     ))
   );

@@ -194,8 +194,9 @@ const Index = () => {
         setSidebarTitle("Transcript Processing Started");
         setSidebarData({
           ...baseSidebarData,
-          ...data,
-          status: "processing_initiated",
+          ...data, // This includes processingId
+          status: "queued", // Optimistically set to 'queued' or 'processing'
+          type: 'transcript', // Ensure type is explicitly set
         });
         setCurrentProcessingId(data.processingId);
       } else {
