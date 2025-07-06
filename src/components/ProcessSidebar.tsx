@@ -20,7 +20,10 @@ import { Progress } from "@/components/ui/progress";
 import { Link } from "react-router-dom";
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'; // Added useCallback
 import { getLanguageName } from "@/lib/utils";
-import { JobStatus, JobType } from "@/lib/videoApi"; // Import JobStatus and JobType
+import { JobStatus, JobType as VideoApiJobType } from "@/lib/videoApi"; // Renamed JobType to avoid conflict
+
+// Define a more specific type for the sidebar's 'type' field
+export type SidebarJobType = VideoApiJobType | 'info';
 
 export interface SidebarData {
   processingId?: string;
@@ -38,7 +41,7 @@ export interface SidebarData {
   mediaUrl?: string;
   fileName?: string;
   mediaType?: 'audio/mpeg' | 'video/mp4' | string;
-  type?: JobType; // Added JobType
+  type?: SidebarJobType; // Updated to use SidebarJobType
   queue_position?: string; // Added for cancellation info
   [key: string]: unknown;
 }
@@ -136,7 +139,40 @@ export const ProcessSidebar: React.FC<ProcessSidebarProps> = ({ isOpen, onOpenCh
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const isPollingProgress = useMemo(() => data?.processingId && typeof data.progress === 'number' && !isProcessFinished, [data]);
 
-  const jsonDataForViewer = useMemo(() => data ? Object.fromEntries(Object.entries(data).filter(([key]) => !['processingId', 'message', 'progressEndpoint', 'resultEndpoint', 'status', 'progress', 'video_title', 'lastUpdated', 'mediaUrl', 'mediaType', 'fileName', 'requestedLang', 'requestedSkipAI', 'requestedAiModel', 'originalUrl', 'type', 'queue_position'].includes(key))) : {}, [data]); // Added type & queue_position to filter
+  const jsonDataForViewer = useMemo(() => {
+    if (!data) return {};
+    // Define keys that are primarily for operational/frontend state, not part of the core API response data to be viewed.
+    const operationalKeys = [
+      'processingId', 'message', 'progressEndpoint', 'resultEndpoint',
+      'status', 'progress', 'lastUpdated', 'mediaUrl', 'mediaType',
+      'fileName', 'requestedLang', 'requestedSkipAI', 'requestedAiModel',
+      'originalUrl', 'type', 'queue_position'
+      // 'video_title' is tricky: it's part of VideoInfo but also a top-level display field.
+      // For type 'info', data itself is VideoInfo, so video_title should be shown in JsonView.
+      // For other types (transcript, mp3, mp4 results), video_title might be metadata about the job, not the direct result.
+      // The current filter already removes 'video_title'. Let's keep it that way for simplicity,
+      // meaning if 'video_title' is a key in a 'full' info response, it will be shown by JsonView
+      // if it's not explicitly filtered here.
+      // The current filter for jsonDataForViewer removes 'video_title'.
+      // If data.type === 'info', the 'data' object IS the VideoInfo.
+      // So, we want to show its fields.
+    ];
+
+    if (data.type === 'info') {
+      // For 'info' type, the `data` object itself contains the information.
+      // We filter out only the operational keys that might have been added on the frontend.
+      const infoSpecificOperationalKeys = ['originalUrl', 'type', 'status', 'progress', 'message', 'progressEndpoint', 'resultEndpoint', 'processingId', 'queue_position'];
+      return Object.fromEntries(
+        Object.entries(data).filter(([key]) => !infoSpecificOperationalKeys.includes(key))
+      );
+    } else {
+      // For other types, use the more general filter
+      const generalOperationalKeys = ['processingId', 'message', 'progressEndpoint', 'resultEndpoint', 'status', 'progress', 'video_title', 'lastUpdated', 'mediaUrl', 'mediaType', 'fileName', 'requestedLang', 'requestedSkipAI', 'requestedAiModel', 'originalUrl', 'type', 'queue_position'];
+      return Object.fromEntries(
+        Object.entries(data).filter(([key]) => !generalOperationalKeys.includes(key))
+      );
+    }
+  }, [data]);
   const hasJsonDataForViewer = Object.keys(jsonDataForViewer).length > 0;
   
   useEffect(() => {
@@ -233,7 +269,12 @@ export const ProcessSidebar: React.FC<ProcessSidebarProps> = ({ isOpen, onOpenCh
     ))
   );
 
-  const processingStatusCard = data && (isTranscriptRequest || isProcessFinished) && (
+  // Show processing status card if there's a job with a processingId (implies an ongoing or completed/failed/canceled backend process)
+  // OR if it's specifically a transcript request (which might have frontend-only states before a processingId is assigned).
+  // OR if the process is finished (which includes canceled).
+  const shouldShowProcessingStatusCard = data && (data.processingId || isTranscriptRequest || isProcessFinished);
+
+  const processingStatusCard = shouldShowProcessingStatusCard && (
     renderCard("Processing Status", Clock, (
       <div className="space-y-2">
         {data.video_title && <p className="text-sm"><strong>Video:</strong> {data.video_title}</p>}

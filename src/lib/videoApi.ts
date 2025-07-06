@@ -81,8 +81,12 @@ export class StillProcessingError extends Error {
   }
 }
 
-export const getVideoInfo = async (videoUrl: string): Promise<VideoInfo> => {
-  const response = await authenticatedFetch(`${API_BASE_URL}/info?url=${encodeURIComponent(videoUrl)}`);
+export const getVideoInfo = async (videoUrl: string, infoType: 'sum' | 'full' = 'sum'): Promise<VideoInfo> => {
+  const params = new URLSearchParams({
+    url: videoUrl,
+    type: infoType,
+  });
+  const response = await authenticatedFetch(`${API_BASE_URL}/info?${params.toString()}`);
   if (!response.ok) {
     const errorData: ErrorResponse = await response.json().catch(() => ({ message: response.statusText }));
     throw new Error(errorData.message || `API request failed with status ${response.status}`);

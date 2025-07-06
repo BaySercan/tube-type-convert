@@ -36,6 +36,7 @@ const Index = () => {
   const [transcriptLang, setTranscriptLang] = useState('tr');
   const [transcriptSkipAI, setTranscriptSkipAI] = useState(false);
   const [aiModel, setAiModel] = useState('deepseek');
+  const [infoType, setInfoType] = useState<'sum' | 'full'>('sum'); // Added state for info type
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [sidebarData, setSidebarData] = useState<ProcessSidebarData | null>(null);
@@ -96,24 +97,31 @@ const Index = () => {
     setShowReopenButton(!isSidebarOpen);
   }, [isSidebarOpen]);
 
-  const infoMutation = useMutation<videoApi.VideoInfo, Error, string>({
-    mutationFn: videoApi.getVideoInfo,
-    onSuccess: (data) => {
-      setSidebarTitle("Video Information");
-      const displayData = {
-        title: data.title,
-        video_id: data.video_id,
-        channel_name: data.channel_name,
-        post_date: data.post_date,
-        originalUrl: url,
+  // For Video Info
+  type InfoMutationArgs = { videoUrl: string; infoType: 'sum' | 'full' };
+  const infoMutation = useMutation<videoApi.VideoInfo, Error, InfoMutationArgs>({
+    mutationFn: (args) => videoApi.getVideoInfo(args.videoUrl, args.infoType),
+    onSuccess: (data, variables) => { // 'data' here is the full VideoInfo object
+      setSidebarTitle(`Video Information (${variables.infoType === 'sum' ? 'Summary' : 'Full Details'})`);
+      const displayData: ProcessSidebarData = {
+        ...data, // Spread the API response
+        originalUrl: variables.videoUrl,
+        type: 'info', // Type is now directly 'info'
+        status: 'completed', // Info requests are typically quick and 'completed'
+        progress: 100,
+        // processingId might not be relevant for info, unless we make one up
       };
       setSidebarData(displayData);
       setErrorForSidebar(null);
     },
-    onError: (error) => {
+    onError: (error, variables) => {
       setSidebarTitle("Error Fetching Info");
       setErrorForSidebar(error.message || "An unknown error occurred.");
-      setSidebarData({ originalUrl: url });
+      setSidebarData({
+        originalUrl: variables.videoUrl,
+        type: 'info', // Type is now directly 'info'
+        status: 'failed'
+      });
     },
   });
 
@@ -321,12 +329,17 @@ const Index = () => {
       return;
     }
 
-    const initialData = { originalUrl: url, status: 'initiated', progress: 0 };
+    const initialData: ProcessSidebarData = {
+      originalUrl: url,
+      status: 'initiated',
+      progress: 0,
+      type: selectedOutput as ProcessSidebarData['type'] // Align with SidebarData['type'] more directly
+    };
     openSidebarForAction(`Preparing ${selectedOutput.toUpperCase()}...`, initialData);
 
     switch (selectedOutput) {
       case 'info':
-        infoMutation.mutate(url);
+        infoMutation.mutate({ videoUrl: url, infoType: infoType });
         break;
       case 'mp3':
         downloadFileMutation.mutate({ url, format: 'mp3' });
@@ -427,6 +440,27 @@ const Index = () => {
                     </RadioGroup>
                   </div>
                 )}
+              </div>
+            )}
+
+            {selectedOutput === 'info' && (
+              <div className="space-y-6 p-6 bg-gray-800/30 border border-gray-700/40 rounded-lg shadow-md mt-6">
+                <h3 className="text-lg font-semibold text-gray-100 mb-4 border-b border-gray-600/50 pb-3">Video Info Options</h3>
+                <div className="space-y-3 pt-4">
+                  <Label className="text-gray-300 font-medium">Select Information Detail</Label>
+                  <RadioGroup value={infoType} onValueChange={(value) => setInfoType(value as 'sum' | 'full')} className="space-y-2" disabled={isProcessing}>
+                    <div className="flex items-center space-x-3">
+                      <RadioGroupItem value="sum" id="info-sum" className="border-gray-500 data-[state=checked]:border-green-500 data-[state=checked]:text-green-500 focus-visible:ring-green-400"/>
+                      <Label htmlFor="info-sum" className="text-gray-300 font-normal cursor-pointer">Summary</Label>
+                    </div>
+                    <p className="text-xs text-gray-400 ml-7">Provides a concise summary of video metadata. (Default)</p>
+                    <div className="flex items-center space-x-3 pt-2">
+                      <RadioGroupItem value="full" id="info-full" className="border-gray-500 data-[state=checked]:border-yellow-500 data-[state=checked]:text-yellow-500 focus-visible:ring-yellow-400"/>
+                      <Label htmlFor="info-full" className="text-gray-300 font-normal cursor-pointer">Full Details</Label>
+                    </div>
+                    <p className="text-xs text-gray-400 ml-7">Provides all available video metadata. Can be very large.</p>
+                  </RadioGroup>
+                </div>
               </div>
             )}
 
