@@ -10,13 +10,17 @@ import {
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Copy, ExternalLink, InfoIcon, AlertTriangleIcon, Download, Loader2, Youtube, FileText, Clock, BrainCircuit } from "lucide-react";
+import { Copy, ExternalLink, InfoIcon, AlertTriangleIcon, Download, Loader2, Youtube, FileText, Clock, BrainCircuit, XCircle } from "lucide-react"; // Added XCircle
 import JsonView from '@uiw/react-json-view';
 import { darkTheme } from '@uiw/react-json-view/dark';
+import { useCancelJob, CancelJobSuccessResponse } from "@/hooks/useCancelJob"; // Import useCancelJob & type
+import { useToast } from "@/components/ui/use-toast"; // Import useToast
+import { useQueryClient } from '@tanstack/react-query'; // Import useQueryClient
 import { Progress } from "@/components/ui/progress";
 import { Link } from "react-router-dom";
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'; // Added useCallback
 import { getLanguageName } from "@/lib/utils";
+import { JobStatus, JobType } from "@/lib/videoApi"; // Import JobStatus and JobType
 
 export interface SidebarData {
   processingId?: string;
@@ -27,13 +31,15 @@ export interface SidebarData {
   requestedLang?: string;
   requestedSkipAI?: boolean;
   requestedAiModel?: string;
-  status?: string;
+  status?: JobStatus | string; // Updated to use JobStatus
   progress?: number;
   video_title?: string;
   lastUpdated?: string;
   mediaUrl?: string;
   fileName?: string;
   mediaType?: 'audio/mpeg' | 'video/mp4' | string;
+  type?: JobType; // Added JobType
+  queue_position?: string; // Added for cancellation info
   [key: string]: unknown;
 }
 
@@ -68,18 +74,69 @@ const YouTubeEmbed = ({ url }: { url: string }) => {
 export const ProcessSidebar: React.FC<ProcessSidebarProps> = ({ isOpen, onOpenChange, title, data, isLoading = false, error = null }) => {
   const funnyWaitingMessages = useMemo(() => ["Reticulating splines...", "Generating witty dialog...", "Spinning up the hamster..."], []);
   const [currentLoadingMessage, setCurrentLoadingMessage] = useState(funnyWaitingMessages[0]);
+  const { toast } = useToast();
+  const { cancelJob, isLoading: isCanceling } = useCancelJob();
+  const queryClient = useQueryClient();
   
+  const handleCancelJobInSidebar = useCallback(async () => {
+    if (!data || !data.processingId) return;
+
+    try {
+      const result = await cancelJob(data.processingId);
+
+      queryClient.setQueryData(['jobProgress', data.processingId], (oldData: SidebarData | undefined) => {
+        const currentProgress = oldData?.progress ?? data.progress ?? 0;
+        if (oldData) {
+          return {
+            ...oldData,
+            status: 'canceled' as JobStatus,
+            queue_position: result.queue_position,
+            video_title: result.video_title || oldData.video_title,
+            video_id: result.video_id || (oldData as any).video_id, // Assuming video_id might be on oldData
+            progress: currentProgress, // Preserve last known progress
+          };
+        }
+        // Fallback if no oldData in cache, construct from current sidebar data + cancel result
+        return {
+          ...data,
+          status: 'canceled' as JobStatus,
+          queue_position: result.queue_position,
+          video_title: result.video_title || data.video_title,
+          // video_id might not be directly on SidebarData, needs careful handling or ensure parent provides it
+        };
+      });
+
+      // Also, if the parent component that controls `ProcessSidebar`'s `data` prop
+      // has its own state update mechanism (e.g. if not using react-query for this specific data),
+      // a callback prop like `onJobUpdate` would be needed here.
+      // For now, relying on react-query cache update.
+
+      toast({
+        title: "Job Cancellation",
+        description: `${result.message}. Title: ${result.video_title || data.video_title || 'N/A'}. ${result.queue_position || ''}`,
+        variant: "default",
+      });
+
+    } catch (error: any) {
+      toast({
+        title: "Cancellation Error",
+        description: error.message || "Could not cancel the job from sidebar.",
+        variant: "destructive",
+      });
+    }
+  }, [data, cancelJob, toast, queryClient]);
+
   const [elapsedTime, setElapsedTime] = useState(0);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const startTimeRef = useRef<number | null>(null);
   const currentProcessingIdRef = useRef<string | null>(null);
 
   const isTranscriptRequest = useMemo(() => !!data?.requestedLang, [data]);
-  const isProcessFinished = useMemo(() => ['completed', 'failed', 'result_error', 'processing_failed', 'final_result_displayed', 'finalizing', 'fetching_result'].includes(data?.status || ""), [data?.status]);
+  const isProcessFinished = useMemo(() => ['completed', 'failed', 'canceled', 'result_error', 'processing_failed', 'final_result_displayed', 'finalizing', 'fetching_result'].includes(data?.status || ""), [data?.status]); // Added 'canceled'
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const isPollingProgress = useMemo(() => data?.processingId && typeof data.progress === 'number' && !isProcessFinished, [data]);
 
-  const jsonDataForViewer = useMemo(() => data ? Object.fromEntries(Object.entries(data).filter(([key]) => !['processingId', 'message', 'progressEndpoint', 'resultEndpoint', 'status', 'progress', 'video_title', 'lastUpdated', 'mediaUrl', 'mediaType', 'fileName', 'requestedLang', 'requestedSkipAI', 'requestedAiModel', 'originalUrl'].includes(key))) : {}, [data]);
+  const jsonDataForViewer = useMemo(() => data ? Object.fromEntries(Object.entries(data).filter(([key]) => !['processingId', 'message', 'progressEndpoint', 'resultEndpoint', 'status', 'progress', 'video_title', 'lastUpdated', 'mediaUrl', 'mediaType', 'fileName', 'requestedLang', 'requestedSkipAI', 'requestedAiModel', 'originalUrl', 'type', 'queue_position'].includes(key))) : {}, [data]); // Added type & queue_position to filter
   const hasJsonDataForViewer = Object.keys(jsonDataForViewer).length > 0;
   
   useEffect(() => {
@@ -180,9 +237,27 @@ export const ProcessSidebar: React.FC<ProcessSidebarProps> = ({ isOpen, onOpenCh
     renderCard("Processing Status", Clock, (
       <div className="space-y-2">
         {data.video_title && <p className="text-sm"><strong>Video:</strong> {data.video_title}</p>}
-        <p className="text-sm"><strong>Status:</strong> <span className={`font-semibold ${isProcessFinished ? 'text-green-400' : 'text-amber-400'}`}>{data.status}</span></p>
-        <Progress value={isProcessFinished ? 100 : data.progress || 0} className="w-full h-3 bg-slate-700" />
-        <p className="text-xs text-right text-slate-400">{isProcessFinished ? 100 : data.progress || 0}% complete</p>
+        <p className="text-sm"><strong>Status:</strong> <span className={`font-semibold ${
+          data.status === 'completed' ? 'text-green-400' :
+          data.status === 'failed' ? 'text-red-400' :
+          data.status === 'canceled' ? 'text-gray-400' : 'text-amber-400'
+        }`}>{data.status}</span></p>
+        <Progress value={data.status === 'canceled' ? (data.progress || 0) : (isProcessFinished ? 100 : data.progress || 0)} className={`w-full h-3 bg-slate-700 ${data.status === 'canceled' ? 'opacity-50' : ''}`} />
+        <p className="text-xs text-right text-slate-400">{data.status === 'canceled' ? `Canceled at ${data.progress || 0}%` : `${isProcessFinished ? 100 : data.progress || 0}% complete`}</p>
+        {data.status === 'canceled' && data.queue_position && <p className="text-xs text-center text-gray-400 pt-1">{data.queue_position}</p>}
+
+        {(data.status === 'queued' || data.status === 'processing') && data.processingId && (
+          <Button
+            onClick={handleCancelJobInSidebar}
+            disabled={isCanceling}
+            variant="destructive"
+            size="sm"
+            className="w-full mt-3"
+          >
+            {isCanceling ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <XCircle className="mr-2 h-4 w-4" />}
+            Cancel Processing
+          </Button>
+        )}
       </div>
     ))
   );

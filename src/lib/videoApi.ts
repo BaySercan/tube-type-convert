@@ -39,14 +39,20 @@ export interface AsyncJobResponse { // New type for 202 response
   // operationType?: 'transcript' | 'mp3' | 'mp4';
 }
 
+export type JobStatus = 'queued' | 'processing' | 'completed' | 'failed' | 'canceled';
+export type JobType = 'mp3' | 'mp4' | 'transcript';
+
 export interface ProgressResponse { // Added export
   id: string; // This is the processingId
-  status: string;
+  status: JobStatus | string; // Allow known statuses or any string for flexibility
   progress: number;
   video_id: string;
   video_title: string;
   createdAt: string; // date-time
   lastUpdated: string; // date-time
+  // Optional fields to be populated by client logic after specific events
+  type?: JobType;
+  queue_position?: string;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type
