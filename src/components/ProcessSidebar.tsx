@@ -9,192 +9,138 @@ import {
 } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Copy, ExternalLink, InfoIcon, AlertTriangleIcon, Download, Loader2 } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Copy, ExternalLink, InfoIcon, AlertTriangleIcon, Download, Loader2, Youtube, FileText, Clock, BrainCircuit } from "lucide-react";
 import JsonView from '@uiw/react-json-view';
 import { darkTheme } from '@uiw/react-json-view/dark';
 import { Progress } from "@/components/ui/progress";
-import { Link } from "react-router-dom"; // Import Link
-import React, { useState, useEffect, useMemo } from 'react'; // Added useMemo
-import { getLanguageName } from "@/lib/utils"; // Import the new utility function
+import { Link } from "react-router-dom";
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { getLanguageName } from "@/lib/utils";
 
-// Define a more specific type for the data prop
-// This helps in accessing properties safely
-export interface SidebarData { // Added export keyword
-  // Properties from AsyncJobResponse (initial 202)
+export interface SidebarData {
   processingId?: string;
-  message?: string;       // Initial message or progress message
+  message?: string;
   progressEndpoint?: string;
   resultEndpoint?: string;
-  originalUrl?: string; // Added for passing to progress/result pages
-
-  // Transcript request parameters (to be displayed if present)
+  originalUrl?: string;
   requestedLang?: string;
   requestedSkipAI?: boolean;
-  requestedAiModel?: string; // Changed from requestedUseDeepSeek
-
-  // Properties from ProgressResponse (polling)
-  status?: string;        // e.g., "processing", "completed", "failed"
-  progress?: number;      // Percentage 0-100
+  requestedAiModel?: string;
+  status?: string;
+  progress?: number;
   video_title?: string;
   lastUpdated?: string;
-
-  // Properties for media playback
   mediaUrl?: string;
+  fileName?: string;
   mediaType?: 'audio/mpeg' | 'video/mp4' | string;
-  fileName?: string; // For download link
-
-  // Can also hold the final TranscriptResponse or other direct results
-  // For simplicity, ReactJson will handle arbitrary other properties.
-  // We'll try to render specific UI for the above, and fallback to ReactJson for the rest.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  [key: string]: any; // Allow other properties for the final JSON data
+  [key: string]: unknown;
 }
 
 interface ProcessSidebarProps {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
   title: string;
-  data: SidebarData | null; // Updated data type
+  data: SidebarData | null;
   isLoading?: boolean;
   error?: string | null;
 }
 
-export const ProcessSidebar: React.FC<ProcessSidebarProps> = ({
-  isOpen,
-  onOpenChange,
-  title,
-  data,
-  isLoading = false,
-  error = null,
-}) => {
-  // useEffect(() => { // Debug log removed
-  //   console.log('[ProcessSidebar] Props received:', { isOpen, title, data: JSON.parse(JSON.stringify(data)), isLoading, error });
-  // }, [isOpen, title, data, isLoading, error]);
+const YouTubeEmbed = ({ url }: { url: string }) => {
+  const videoId = useMemo(() => {
+    try {
+      const videoUrl = new URL(url);
+      if (videoUrl.hostname === "youtu.be") return videoUrl.pathname.slice(1);
+      if (videoUrl.hostname.includes("youtube.com")) return videoUrl.searchParams.get("v");
+    } catch (e) { console.error("Invalid YouTube URL for embedding:", e); }
+    return null;
+  }, [url]);
 
-  const funnyWaitingMessages = useMemo(() => [
-    "Reticulating splines...",
-    "Generating witty dialog...",
-    "Swapping time and space...",
-    "Spinning up the hamster...",
-    "Shoveling coal into the server...",
-    "Programming the flux capacitor...",
-    "Realigning the dilithium crystals...",
-    "Definitely not mining crypto...",
-    "Almost there, maybe...",
-    "Still faster than a fax machine!",
-    "Hold on, our AI is composing a sonnet about your request.",
-    "Are we there yet?",
-    "Just counting to infinity, be right with you.",
-    "Warming up the tubes...",
-    "Polishing the pixels...",
-  ], []);
+  if (!videoId) return <div className="aspect-video w-full bg-black flex items-center justify-center text-white rounded-lg"><p>Invalid YouTube URL</p></div>;
 
+  return (
+    <div className="aspect-video w-full rounded-lg overflow-hidden border border-slate-700 shadow-lg">
+      <iframe width="100%" height="100%" src={`https://www.youtube.com/embed/${videoId}`} title="YouTube video player" frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen></iframe>
+    </div>
+  );
+};
+
+export const ProcessSidebar: React.FC<ProcessSidebarProps> = ({ isOpen, onOpenChange, title, data, isLoading = false, error = null }) => {
+  const funnyWaitingMessages = useMemo(() => ["Reticulating splines...", "Generating witty dialog...", "Spinning up the hamster..."], []);
   const [currentLoadingMessage, setCurrentLoadingMessage] = useState(funnyWaitingMessages[0]);
-  const [timerStartTime, setTimerStartTime] = useState<number | null>(null);
+  
   const [elapsedTime, setElapsedTime] = useState(0);
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const startTimeRef = useRef<number | null>(null);
+  const currentProcessingIdRef = useRef<string | null>(null);
 
-  // Moved constant declarations before useEffect hooks that depend on them
-  const isFinalData = data && !data.processingId && !data.progressEndpoint && data.status !== 'processing_initiated' && typeof data.progress === 'undefined';
-  const isAsyncJobInitial = data && data.processingId && data.status === 'processing_initiated';
-  const isPollingProgress = data && data.processingId && typeof data.progress === 'number' && data.status !== 'completed' && data.status !== 'failed' && data.status !== "result_error" && data.status !== "processing_failed" && data.status !== "final_result_displayed";
-  const isTranscriptRequest = title.toLowerCase().includes("transcript");
+  const isTranscriptRequest = useMemo(() => !!data?.requestedLang, [data]);
+  const isProcessFinished = useMemo(() => ['completed', 'failed', 'result_error', 'processing_failed', 'final_result_displayed', 'finalizing', 'fetching_result'].includes(data?.status || ""), [data?.status]);
+  const isPollingProgress = useMemo(() => data?.processingId && typeof data.progress === 'number' && !isProcessFinished, [data]);
 
-  // Log conditional variables
-  // useEffect(() => { // Debug log removed
-  //   const currentData = JSON.parse(JSON.stringify(data));
-  //   console.log('[ProcessSidebar] Conditional states:', {
-  //     data: currentData,
-  //     isFinalData,
-  //     isAsyncJobInitial,
-  //     isPollingProgress,
-  //     isTranscriptRequest,
-  //     isLoading,
-  //     hasJsonDataForViewer: Object.keys(jsonDataForViewer).length > 0, // Re-evaluate for logging context
-  //     title
-  //   });
-  // }, [data, isLoading, title, isFinalData, isAsyncJobInitial, isPollingProgress, isTranscriptRequest]); // jsonDataForViewer is not stable, so re-evaluate its check
-
+  const jsonDataForViewer = useMemo(() => data ? Object.fromEntries(Object.entries(data).filter(([key]) => !['processingId', 'message', 'progressEndpoint', 'resultEndpoint', 'status', 'progress', 'video_title', 'lastUpdated', 'mediaUrl', 'mediaType', 'fileName', 'requestedLang', 'requestedSkipAI', 'requestedAiModel', 'originalUrl'].includes(key))) : {}, [data]);
+  const hasJsonDataForViewer = Object.keys(jsonDataForViewer).length > 0;
+  
   useEffect(() => {
     let messageInterval: NodeJS.Timeout;
-    if (isLoading && !data?.progress) { // Only cycle if it's the initial loading state for funny messages
-      setCurrentLoadingMessage(funnyWaitingMessages[Math.floor(Math.random() * funnyWaitingMessages.length)]);
-      messageInterval = setInterval(() => {
-        setCurrentLoadingMessage(funnyWaitingMessages[Math.floor(Math.random() * funnyWaitingMessages.length)]);
-      }, 3000);
+    if (isLoading && !isPollingProgress && !isProcessFinished) {
+      messageInterval = setInterval(() => setCurrentLoadingMessage(funnyWaitingMessages[Math.floor(Math.random() * funnyWaitingMessages.length)]), 3000);
     }
-    return () => {
-      clearInterval(messageInterval);
-    };
-  }, [isLoading, data?.progress, funnyWaitingMessages]); // Rerun effect if isLoading or progress status changes
+    return () => clearInterval(messageInterval);
+  }, [isLoading, isPollingProgress, isProcessFinished, funnyWaitingMessages]);
 
-  // Timer effect for AI transcript
+  // This is the single, definitive timer management effect.
   useEffect(() => {
-    let timerInterval: NodeJS.Timeout | undefined;
-
-    // Define when the timer should be actively running and counting
-    // Derived from existing component constants/props
-    const shouldRunTimer = isTranscriptRequest && (isPollingProgress || (isLoading && !data?.progress && !error));
-
-    console.log('[TimerEffect] Evaluating. shouldRunTimer:', shouldRunTimer, 'timerStartTime:', timerStartTime, 'data:', data, 'error:', error, 'isLoading:', isLoading);
+    // Condition to reset: It's a new transcript job.
+    if (isTranscriptRequest && data?.processingId && data.processingId !== currentProcessingIdRef.current) {
+        currentProcessingIdRef.current = data.processingId;
+        setElapsedTime(0);
+        startTimeRef.current = null; // Will be set when timer starts
+        if (intervalRef.current) {
+            clearInterval(intervalRef.current);
+            intervalRef.current = null;
+        }
+    } else if (!isTranscriptRequest) {
+      // If it's not a transcript request, ensure everything is reset.
+      currentProcessingIdRef.current = null;
+      startTimeRef.current = null;
+      setElapsedTime(0);
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+    }
+    
+    const shouldRunTimer = isTranscriptRequest && !isProcessFinished;
 
     if (shouldRunTimer) {
-      if (timerStartTime === null) {
-        // This is a new process or a restart after being stopped/reset
-        console.log('[TimerEffect] Starting or restarting timer.');
-        setTimerStartTime(Date.now());
-        setElapsedTime(0); // Explicitly reset elapsed time
-      }
-      // Set up the interval to update elapsed time
-      // timerStartTime will be non-null here due to the block above or previous renders if shouldRunTimer is true
-      if (timerStartTime !== null) { // Ensure timerStartTime is set before creating interval
-        timerInterval = setInterval(() => {
-          setElapsedTime(Date.now() - timerStartTime);
-        }, 1000);
-      } else if (timerStartTime === null && !(isLoading && !data?.progress && !error)) {
-        // This case can happen if isPollingProgress is true but timerStartTime was not set (e.g. loading initial state for an already running job)
-        // For this specific case, we should also start the timer.
-        // However, the (timerStartTime === null) block above should ideally catch this if 'isLoading' reflects the initial phase.
-        // For safety, if timerStartTime is still null but we are supposed to be running (especially for polling), initialize it.
-        // This might indicate a rapid state change or an edge case in how `isLoading` is managed externally.
-        console.log('[TimerEffect] Starting timer because shouldRunTimer is true but timerStartTime was null (polling scenario).');
-        setTimerStartTime(Date.now());
-        setElapsedTime(0);
-        // And set up the interval
-        timerInterval = setInterval(() => {
-          // Re-access timerStartTime from state in case it was set in this render pass by setTimerStartTime
-          // This requires timerStartTime to be a dependency or use the functional update form of setElapsedTime
-          setElapsedTime(prev => Date.now() - (timerStartTime || Date.now())); // Use current timerStartTime
-        }, 1000);
-      }
-    } else {
-      // Timer should not be running (not a transcript, or process ended/error)
-      if (timerStartTime !== null || elapsedTime !== 0) {
-        console.log('[TimerEffect] Stopping timer and resetting state because shouldRunTimer is false.');
-        setTimerStartTime(null);
-        setElapsedTime(0);
-      }
+        if (intervalRef.current === null) { // Start timer only if it's not already running.
+            startTimeRef.current = startTimeRef.current ?? Date.now();
+            intervalRef.current = setInterval(() => {
+                setElapsedTime(Date.now() - (startTimeRef.current ?? Date.now()));
+            }, 1000);
+        }
+    } else { // If the timer should not be running.
+        if (intervalRef.current) {
+            clearInterval(intervalRef.current);
+            intervalRef.current = null;
+            // When the process finishes, do one last update to get the exact final time.
+            if (isProcessFinished && startTimeRef.current) {
+                setElapsedTime(Date.now() - startTimeRef.current);
+            }
+        }
     }
 
+    // Final cleanup when the component unmounts
     return () => {
-      if (timerInterval) {
-        console.log('[TimerEffect] Cleanup: Clearing interval.');
-        clearInterval(timerInterval);
-      }
+        if (intervalRef.current) {
+            clearInterval(intervalRef.current);
+        }
     };
-  }, [
-    isTranscriptRequest,
-    isPollingProgress,
-    isLoading,
-    data, // Full data object as dependency
-    error,
-    timerStartTime, // timerStartTime state
-    // Removed data?.status, data?.progress as 'data' covers them.
-    // Removed elapsedTime from dependencies; it's set by the effect, not a trigger for it.
-    elapsedTime
-  ]);
+  }, [data?.processingId, isTranscriptRequest, isProcessFinished]);
 
 
-  const formatTime = (ms: number): string => {
+  const formatTime = (ms: number) => {
     const totalSeconds = Math.floor(ms / 1000);
     const minutes = Math.floor(totalSeconds / 60);
     const seconds = totalSeconds % 60;
@@ -203,272 +149,141 @@ export const ProcessSidebar: React.FC<ProcessSidebarProps> = ({
 
   const handleCopyJson = () => {
     if (data) {
-      // Only copy the parts that are actual JSON results, not our UI state properties
-      const dataToCopy = { ...data };
-      delete dataToCopy.processingId;
-      delete dataToCopy.message;
-      delete dataToCopy.progressEndpoint;
-      delete dataToCopy.resultEndpoint;
-      delete dataToCopy.status;
-      delete dataToCopy.progress;
-      delete dataToCopy.video_title;
-      delete dataToCopy.lastUpdated;
-
-      navigator.clipboard.writeText(JSON.stringify(dataToCopy, null, 2))
-        .then(() => console.log("Filtered JSON copied to clipboard"))
-        .catch(err => console.error("Failed to copy filtered JSON: ", err));
+      navigator.clipboard.writeText(JSON.stringify(jsonDataForViewer, null, 2)).catch(err => console.error("Failed to copy: ", err));
     }
   };
 
-  // Data specifically for ReactJson (filtering out our custom polling/status fields if they are mixed)
-  const jsonDataForViewer = data ? Object.fromEntries(
-    Object.entries(data).filter(([key]) => ![
-      'processingId', 'message', 'progressEndpoint', 'resultEndpoint',
-      'status', 'progress', 'video_title', 'lastUpdated',
-      'mediaUrl', 'mediaType', 'fileName', // Exclude media player fields
-      'requestedLang', 'requestedSkipAI', 'requestedAiModel', 'originalUrl' // Exclude request params as they are displayed separately
-    ].includes(key))
-  ) : {};
-  const hasJsonDataForViewer = Object.keys(jsonDataForViewer).length > 0;
+  const renderCard = (title: string, Icon: React.ElementType, content: React.ReactNode, cardClassName?: string) => (
+    <Card className={`bg-slate-800/60 border-slate-700 text-slate-200 shadow-lg ${cardClassName}`}>
+      <CardHeader className="flex flex-row items-center justify-between pb-2">
+        <CardTitle className="text-base font-semibold flex items-center text-white">
+          <Icon className="w-5 h-5 mr-3 text-cyan-400" />
+          {title}
+        </CardTitle>
+      </CardHeader>
+      <CardContent>{content}</CardContent>
+    </Card>
+  );
 
-  // Determine if the sidebar is opened without any specific content to show initially
-  // This happens if isOpen, but no data, no error, and not in a loading state that would soon populate data.
-  // The `isLoading` prop passed from Index.tsx reflects mutations pending or polling active.
-  // If `isLoading` is true, we expect content or an error soon.
-  // If `isLoading` is false, and there's no data/error, then it's truly "empty" on open.
-  const showEmptyStateMessage = isOpen && !data && !error && !isLoading;
+  const transcriptOptionsCard = data && (data.requestedLang || data.requestedSkipAI !== undefined) && (
+    renderCard("Transcript Options", FileText, (
+      <div className="space-y-1 text-sm text-slate-300">
+        {data.requestedLang && <p><strong>Language:</strong> {getLanguageName(data.requestedLang)}</p>}
+        {typeof data.requestedSkipAI !== 'undefined' && <p><strong>Skip AI:</strong> {data.requestedSkipAI ? 'Yes' : 'No'}</p>}
+        {!data.requestedSkipAI && data.requestedAiModel && <p><strong>AI Model:</strong> {data.requestedAiModel.charAt(0).toUpperCase() + data.requestedAiModel.slice(1)}</p>}
+      </div>
+    ))
+  );
 
+  const processingStatusCard = data && (isTranscriptRequest || isProcessFinished) && (
+    renderCard("Processing Status", Clock, (
+      <div className="space-y-2">
+        {data.video_title && <p className="text-sm"><strong>Video:</strong> {data.video_title}</p>}
+        <p className="text-sm"><strong>Status:</strong> <span className={`font-semibold ${isProcessFinished ? 'text-green-400' : 'text-amber-400'}`}>{data.status}</span></p>
+        <Progress value={isProcessFinished ? 100 : data.progress || 0} className="w-full h-3 bg-slate-700" />
+        <p className="text-xs text-right text-slate-400">{isProcessFinished ? 100 : data.progress || 0}% complete</p>
+      </div>
+    ))
+  );
+
+  const elapsedTimeCard = isTranscriptRequest && data?.processingId && (
+    renderCard(isProcessFinished ? "Total Time" : "Elapsed Time", Clock, <p className="text-2xl font-mono text-cyan-400 tracking-wider text-center">{formatTime(elapsedTime)}</p>, "items-center justify-center")
+  );
+
+  const apiLinksCard = data && (isTranscriptRequest || isProcessFinished) && (data.progressEndpoint || data.resultEndpoint) && (
+    renderCard("API Links", ExternalLink, (
+      <div className="space-y-1">
+        {data.progressEndpoint && data.processingId && <Link to={`/progress/${data.processingId}`} state={{ videoUrl: data.originalUrl, videoTitle: data.video_title }} target="_blank" className="text-blue-400 hover:underline text-sm flex items-center">View Progress Page <ExternalLink className="inline-block ml-1 h-3 w-3" /></Link>}
+        {data.resultEndpoint && data.processingId && <Link to={`/result/${data.processingId}`} state={{ videoUrl: data.originalUrl, videoTitle: data.video_title }} target="_blank" className="text-blue-400 hover:underline text-sm flex items-center">View Result Page <ExternalLink className="inline-block ml-1 h-3 w-3" /></Link>}
+      </div>
+    ))
+  );
+
+  const jsonResultCard = hasJsonDataForViewer && (
+    renderCard("Result JSON", BrainCircuit, (
+      <div className="relative rounded-md bg-slate-900/70 border border-slate-700 w-full overflow-hidden">
+        <Button variant="ghost" size="icon" onClick={handleCopyJson} className="absolute top-2 right-2 text-slate-400 hover:text-white z-10" title="Copy JSON"><Copy className="h-4 w-4" /></Button>
+        <JsonView value={jsonDataForViewer} displayObjectSize displayDataTypes enableClipboard={false} collapsed={false} style={{...darkTheme, padding: '1rem', paddingTop: '2.5rem'}} />
+      </div>
+    ))
+  );
 
   return (
     <Sheet open={isOpen} onOpenChange={onOpenChange}>
-      <SheetContent className="sm:max-w-2xl w-[90vw] flex flex-col"> {/* Changed sm:max-w-lg to sm:max-w-2xl */}
-        <SheetHeader>
-          <SheetTitle>{title}</SheetTitle>
-          <SheetDescription>
-            {error ? "An error occurred." : "View the process details below."} {/* Removed top loading indicator */}
-            {/* The funny loading message and spinner are now only in the main content area */}
-            {data?.lastUpdated && <span className="text-xs block text-gray-400">Last updated: {data.lastUpdated}</span>}
-          </SheetDescription>
+      <SheetContent className="sm:max-w-4xl w-[95vw] flex flex-col bg-slate-900 border-l border-slate-800 text-white">
+        <SheetHeader className="px-6 py-4 border-b border-slate-800">
+          <SheetTitle className="text-xl font-bold flex items-center text-white"><Youtube className="w-6 h-6 mr-3 text-red-500" /> {title}</SheetTitle>
+          <SheetDescription className="text-slate-400">{error ? "An error occurred." : "Process details and results."}</SheetDescription>
         </SheetHeader>
 
-        {/* Warning Message */}
-        <div className="p-3 mb-4 w-full border border-red-600 bg-red-800/80 rounded-md text-red-100 text-xs"> {/* Changed to red theme for higher alert, adjusted margins/width */}
-          <div className="flex items-center space-x-2">
-            <AlertTriangleIcon className="h-5 w-5 text-red-300 flex-shrink-0" /> {/* Icon to match red theme */}
-            <p>
-              <strong>Important:</strong> Results displayed here are temporary. Please save your data (copy JSON, download files) as it will be lost when you refresh or start a new process.
-            </p>
+        <ScrollArea className="flex-grow p-4">
+          <div className="p-3 mb-4 w-full border border-red-600 bg-red-800/80 rounded-md text-red-100 text-xs">
+            <div className="flex items-center space-x-2">
+              <AlertTriangleIcon className="h-5 w-5 text-red-300 flex-shrink-0" />
+              <p><strong>Important:</strong> Results are temporary. Please save your data as it will be lost on refresh.</p>
+            </div>
           </div>
-        </div>
 
-        <ScrollArea className="flex-grow">
-          {/* AI Transcript Warning */}
-          {isTranscriptRequest && (isPollingProgress || (isLoading && !data?.progress && !error)) && (
-            <div className="p-3 border border-sky-600 bg-sky-900/60 rounded-md text-sky-100 text-xs shadow w-full mb-4"> {/* Changed to sky theme, removed my-2, added w-full */}
+          {isTranscriptRequest && !isProcessFinished && (
+            <div className="p-3 mb-4 border border-sky-600 bg-sky-900/60 rounded-md text-sky-100 text-xs shadow">
               <div className="flex items-center space-x-2">
-                <InfoIcon className="h-5 w-5 text-sky-300 flex-shrink-0" /> {/* Icon to match sky theme */}
-                <p>
-                  AI transcription can take some time depending on the video length. Please be patient.
-                </p>
+                <InfoIcon className="h-5 w-5 text-sky-300 flex-shrink-0" />
+                <p>AI transcription can take some time depending on the video length. Please be patient.</p>
               </div>
             </div>
           )}
 
-          {/* Display Transcript Request Parameters */}
-          {isTranscriptRequest && data && (typeof data.requestedLang !== 'undefined' || typeof data.requestedSkipAI !== 'undefined' || typeof data.requestedAiModel !== 'undefined') && (
-            <div className="p-4 rounded-md bg-slate-700/80 text-slate-100 shadow-md w-full mb-4 border border-slate-600">
-              <h4 className="font-semibold text-base text-slate-100 mb-3 pb-2 border-b border-slate-600">
-                Transcript Request Options
-              </h4>
-              <div className="space-y-2 text-sm">
-                {typeof data.requestedLang !== 'undefined' && (
-                  <p><strong>Language:</strong> <span className="text-slate-300">{getLanguageName(data.requestedLang)}</span></p>
-                )}
-                {typeof data.requestedSkipAI !== 'undefined' && (
-                  <p><strong>Skip AI Post-processing:</strong> <span className="text-slate-300">{data.requestedSkipAI ? 'Yes' : 'No'}</span></p>
-                )}
-                {/* Display AI Model only if Skip AI is false and model is present */}
-                {!data.requestedSkipAI && typeof data.requestedAiModel !== 'undefined' && data.requestedAiModel && (
-                  <p><strong>AI Model:</strong> <span className="text-slate-300">{data.requestedAiModel.charAt(0).toUpperCase() + data.requestedAiModel.slice(1)}</span></p>
-                )}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
+            <div className="space-y-4 lg:col-span-1">
+              {data?.originalUrl && <YouTubeEmbed url={data.originalUrl} />}
+              {isTranscriptRequest && transcriptOptionsCard}
+            </div>
+            
+            {isTranscriptRequest && (
+              <div className="space-y-4 lg:col-span-1">
+                {processingStatusCard}
+                {elapsedTimeCard}
+                {apiLinksCard}
               </div>
-            </div>
-          )}
-
-          {/* ReactJson viewer for any other data that isn't specifically handled above */}
-          {hasJsonDataForViewer && !isPollingProgress && !data?.mediaUrl && ( // Conditionally render if there's data and it's not progress or media
-            <div className="relative rounded-md bg-slate-800/60 border border-slate-700 shadow w-full mb-4 overflow-hidden"> {/* Added relative positioning */}
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={handleCopyJson}
-                className="absolute top-2 right-2 text-slate-300 hover:text-slate-100 hover:bg-slate-700 z-10" // Positioned copy button
-                title="Copy JSON"
-              >
-                <Copy className="h-4 w-4" />
-              </Button>
-              <JsonView
-                value={jsonDataForViewer}
-                displayObjectSize={true}
-                displayDataTypes={true}
-                enableClipboard={true} // Disable built-in copy feature as a custom one is used
-                collapsed={false} // Start expanded
-                style={{
-                  ...darkTheme,
-                  padding: '1rem',
-                  paddingTop: '2.5rem', // To avoid overlap with the custom copy button
-                  // backgroundColor: 'black' // darkTheme should handle this
-                }}
-                // keyName={undefined} // Omitting keyName to avoid "root" if that's the default
-                // iconStyle:  //Not a direct prop, default triangles will be used.
-                // theme: Handled by merging darkTheme with custom styles.
-              />
-            </div>
-          )}
-
-          {/* Timer Display - Placed outside the AI warning, but still conditional on transcript request & timer having started */}
-          {isTranscriptRequest && timerStartTime !== null && (
-            <div className="p-3 bg-slate-700 rounded-md text-center shadow w-full mb-4"> {/* Removed my-3, added w-full */}
-              <p className="text-xs text-slate-300 mb-1">Elapsed Time</p>
-              <p className="text-2xl font-mono text-cyan-400 tracking-wider">
-                {formatTime(elapsedTime)}
-              </p>
-            </div>
-          )}
-
-          {isLoading && !data?.progress && ( // Show general loading spinner if no progress yet
-            <div className="flex flex-col items-center justify-center h-full space-y-3 text-center w-full mb-4"> {/* Added w-full (though flex might handle it) */}
-              <Loader2 className="h-10 w-10 animate-spin text-blue-400" />
-              <p className="text-lg font-medium text-gray-700">{currentLoadingMessage}</p> {/* Changed text-white to text-slate-300 for better contrast as requested */}
-              {/* Removed: <p className="text-sm text-gray-400">Please wait a moment...</p> */}
-            </div>
-          )}
-
-          {error && (
-            <div className="text-red-500 p-3 border border-red-600 bg-red-900/20 rounded-md w-full mb-4"> {/* Added w-full */}
-              <div className="flex items-center space-x-2">
-                <AlertTriangleIcon className="h-5 w-5 text-red-500" />
-                <p className="font-semibold">Error:</p>
-              </div>
-              <pre className="whitespace-pre-wrap text-sm mt-1">{error}</pre>
-            </div>
-          )}
-
-          {/* Display for initial Async Job Response (202) */}
-          {isAsyncJobInitial && data?.message && (
-            <div className="p-4 rounded-md bg-slate-700 text-slate-100 shadow w-full mb-4"> {/* New styling, added w-full */}
-              <div className="flex items-center space-x-2 mb-2">
-                <InfoIcon className="h-5 w-5 text-blue-300 flex-shrink-0" /> {/* Adjusted icon color */}
-                <p className="font-semibold">Processing Started</p>
-              </div>
-              <p className="text-sm">{data.message}</p>
-            </div>
-          )}
-
-          {/* Media Player Section */}
-          {data?.mediaUrl && data.mediaType && (
-            <div className="p-4 bg-zinc-800 border border-slate-700 rounded-lg space-y-4 shadow-md w-full mb-4"> {/* Changed bg-slate-800/60 to bg-zinc-800, added w-full */}
-              <h4 className="font-semibold text-base text-gray-100">Media Preview:</h4> {/* Increased text size */}
-              {data.mediaType.startsWith('audio/') && (
-                <audio controls src={data.mediaUrl} className="w-full border border-slate-600 rounded-md"> {/* Added border to audio player */}
-                  Your browser does not support the audio element.
-                </audio>
-              )}
-              {data.mediaType.startsWith('video/') && (
-                <video controls src={data.mediaUrl} className="w-full rounded-md border border-slate-600" style={{maxHeight: '300px'}}> {/* Added border to video player */}
-                  Your browser does not support the video tag.
-                </video>
-              )}
-              {data.fileName && (
-                 <Button
-                    variant="default" // Changed to default, assuming it's more prominent
-                    className="w-full h-12 text-base font-semibold bg-blue-600 hover:bg-blue-500 text-white flex items-center justify-center space-x-2" // Enhanced button styling
-                    onClick={() => {
-                      const link = document.createElement('a');
-                      link.href = data.mediaUrl!;
-                      link.download = data.fileName!;
-                      document.body.appendChild(link);
-                      link.click();
-                      document.body.removeChild(link);
-                    }}
-                  >
-                    <Download className="h-5 w-5 mr-2" /> {/* Added Download icon */}
-                    <span>Download {data.fileName}</span>
-                  </Button>
-              )}
-              <p className="text-xs text-gray-400 text-center mt-2">
-                If the download didn't start automatically, click the button above.
-              </p>
-            </div>
-          )}
-
-          {/* Display for Polling Progress */}
-          {isPollingProgress && data && (
-            <div className="space-y-3 p-4 rounded-md bg-slate-700 text-slate-100 shadow w-full mb-4"> {/* New styling, increased space-y, added w-full */}
-              {data.video_title && <p className="text-sm font-medium">Video: <span className="font-normal text-slate-300">{data.video_title}</span></p>}
-              <p className="text-sm font-medium">Status: <span className="font-semibold text-amber-400">{data.status}</span></p> {/* Status color changed */}
-              {typeof data.progress === 'number' && (
-                <>
-                  <Progress value={data.progress} className="w-full h-5" /> {/* Increased height from h-3 to h-5 */}
-                  <p className="text-sm text-right text-slate-300">{data.progress}% complete</p>
-                </>
-              )}
-            </div>
-          )}
-
-          {/* Display Endpoints if available (from initial 202 or progress) - MOVED TO BOTTOM */}
-          {data && (data.progressEndpoint || data.resultEndpoint) && (
-            <div className="space-y-2 p-4 rounded-md bg-slate-700 text-slate-100 shadow w-full mb-4"> {/* Changed styling, consistent with other cards, removed mt-4, added w-full */}
-              <h4 className="font-semibold text-base text-slate-100 mb-2">API Endpoints:</h4> {/* Increased text size and margin */}
-              {data.progressEndpoint && data.processingId && (
-                <div className="flex items-center space-x-2">
-                  <Link
-                    to={`/progress/${data.processingId}`}
-                    state={{ videoUrl: data.originalUrl, videoTitle: data.video_title }} // Pass relevant data
-                    target="_blank"
-                    className="p-0 h-auto text-blue-400 hover:text-blue-300 text-xs inline-flex items-center hover:underline"
-                  >
-                    View Progress Page <ExternalLink className="inline-block ml-1 h-3 w-3" />
-                  </Link>
+            )}
+            
+            <div className="mt-4 space-y-4 lg:col-span-2">
+              {!isTranscriptRequest && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {transcriptOptionsCard}
+                  {processingStatusCard}
+                  {elapsedTimeCard}
+                  {apiLinksCard}
                 </div>
               )}
-              {data.resultEndpoint && data.processingId && (
-                <div className="flex items-center space-x-2">
-                  <Link
-                    to={`/result/${data.processingId}`}
-                    state={{ videoUrl: data.originalUrl, videoTitle: data.video_title }} // Pass relevant data
-                    target="_blank"
-                    className="p-0 h-auto text-blue-400 hover:text-blue-300 text-xs inline-flex items-center hover:underline"
-                  >
-                    View Result Page <ExternalLink className="inline-block ml-1 h-3 w-3" />
-                  </Link>
+              {data?.mediaUrl && data.mediaType && renderCard("Media Preview", Download, (
+                <div className="space-y-2">
+                  {data.mediaType.startsWith('audio/') && <audio controls src={data.mediaUrl} className="w-full" />}
+                  {data.mediaType.startsWith('video/') && <video controls src={data.mediaUrl} className="w-full rounded-md" style={{maxHeight: '300px'}} />}
+                  {data.fileName && (
+                    <>
+                      <Button variant="default" className="w-full bg-blue-600 hover:bg-blue-500" onClick={() => { const link = document.createElement('a'); link.href = data.mediaUrl!; link.download = data.fileName!; document.body.appendChild(link); link.click(); document.body.removeChild(link); }}><Download className="h-5 w-5 mr-2" /> Download {data.fileName}</Button>
+                      <p className="text-xs text-gray-400 text-center mt-1">If your download didn't start, use this button.</p>
+                    </>
+                  )}
                 </div>
-              )}
+              ))}
+              {jsonResultCard}
+            </div>
+          </div>
+          
+          {isLoading && !isPollingProgress && !isProcessFinished && (
+            <div className="flex flex-col items-center justify-center space-y-3 p-1">
+              <Loader2 className="h-12 w-12 animate-spin text-blue-400" />
+              <p className="text-lg font-medium text-slate-300">{currentLoadingMessage}</p>
             </div>
           )}
 
-          {showEmptyStateMessage && (
-            <div className="flex flex-col items-center justify-center h-full text-center p-4">
-              <InfoIcon className="h-12 w-12 text-gray-500 mb-4" />
-              <h3 className="text-lg font-semibold text-gray-700 mb-2">Sidebar Empty</h3>
-              <p className="text-sm text-gray-500">
-                Start a process from the main page to see details and results here.
-              </p>
-            </div>
-          )}
-
-          {/* Fallback for "No data to display yet" if it's not loading, no error, but also not the initial empty state (e.g. data was cleared) */}
-          {!isLoading && !error && !data && !showEmptyStateMessage && (
-             <div className="flex items-center justify-center h-full">
-              <p className="text-gray-400">No data to display yet.</p>
-            </div>
-          )}
+          {error && renderCard("Error", AlertTriangleIcon, <pre className="whitespace-pre-wrap text-sm text-red-400 bg-red-900/30 p-3 rounded-md">{error}</pre>, "col-span-full")}
         </ScrollArea>
 
-        <SheetFooter className="mt-auto pt-4 border-t border-gray-700">
-          <SheetClose asChild>
-            <Button variant="outline">Close</Button>
-          </SheetClose>
+        <SheetFooter className="mt-auto px-6 py-4 border-t border-slate-800">
+          <SheetClose asChild><Button variant="outline" className="bg-slate-700 border-slate-600 hover:bg-slate-600">Close</Button></SheetClose>
         </SheetFooter>
       </SheetContent>
     </Sheet>

@@ -5,14 +5,13 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "@/hooks/use-toast";
 import { ToastAction } from "@/components/ui/toast";
-import { Youtube, Download, FileText, Info, Music, Video, Zap, Sparkles, Loader2, ChevronsLeft } from 'lucide-react'; // Added ChevronsLeft
-// import { useNavigate } from 'react-router-dom'; // Already imported in Dashboard, might not be needed here if not navigating from Index for these actions
+import { Youtube, Download, FileText, Info, Music, Video, Zap, Sparkles, Loader2, ChevronsLeft } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"; // Import RadioGroup
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
   Select,
   SelectContent,
@@ -21,40 +20,33 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-
-// Imports from DashboardPage
 import { ProcessSidebar } from "@/components/ProcessSidebar";
-import type { SidebarData as ProcessSidebarData } from "@/components/ProcessSidebar"; // Import SidebarData type
+import type { SidebarData as ProcessSidebarData } from "@/components/ProcessSidebar";
 import * as videoApi from '@/lib/videoApi';
-import { StillProcessingError } from '@/lib/videoApi'; // Import the custom error
-import type { AsyncJobResponse, TranscriptResponse, ProgressResponse } from '@/lib/videoApi'; // Import types
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'; // Added useQuery
+import { StillProcessingError } from '@/lib/videoApi';
+import type { AsyncJobResponse, TranscriptResponse, ProgressResponse } from '@/lib/videoApi';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 
 const Index = () => {
   const { user } = useAuth();
-  // const navigate = useNavigate(); // Keep if navigation is needed, e.g., after logout
-  const [url, setUrl] = useState(''); // Renamed from videoUrl for consistency with existing Index.tsx state
+  const [url, setUrl] = useState('');
   const [selectedOutput, setSelectedOutput] = useState('');
-  // const [isProcessing, setIsProcessing] = useState(false); // Will be replaced by mutation loading states
 
-  // State for AI Transcript options
   const [transcriptLang, setTranscriptLang] = useState('tr');
   const [transcriptSkipAI, setTranscriptSkipAI] = useState(false);
-  const [aiModel, setAiModel] = useState('deepseek'); // New state for AI model
+  const [aiModel, setAiModel] = useState('deepseek');
 
-  // State for ProcessSidebar (from DashboardPage)
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [sidebarData, setSidebarData] = useState<ProcessSidebarData | null>(null); // Use imported ProcessSidebarData
+  const [sidebarData, setSidebarData] = useState<ProcessSidebarData | null>(null);
   const [sidebarTitle, setSidebarTitle] = useState("Process Details");
   const [sidebarError, setErrorForSidebar] = useState<string | null>(null);
-  const [showReopenButton, setShowReopenButton] = useState(true); // Initialize to true, as sidebar is initially closed
-  const [activeBlobUrl, setActiveBlobUrl] = useState<string | null>(null); // To manage blob URL for media player
+  const [showReopenButton, setShowReopenButton] = useState(true);
+  const [activeBlobUrl, setActiveBlobUrl] = useState<string | null>(null);
 
   const [currentProcessingId, setCurrentProcessingId] = useState<string | null>(null);
-  // We'll use React Query's refetchInterval for polling progress
+  const [jobIdForResults, setJobIdForResults] = useState<string | null>(null);
 
-  // queryClient can be useful for cache invalidation or refetching, uncomment if needed
   const queryClient = useQueryClient();
 
   const transcriptLanguages = [
@@ -63,7 +55,6 @@ const Index = () => {
     { value: 'es', label: 'Spanish' },
     { value: 'fr', label: 'French' },
     { value: 'de', label: 'German' },
-    // Add more languages as needed
   ];
 
   const outputOptions = [
@@ -73,12 +64,11 @@ const Index = () => {
     { id: 'info', label: 'Video Info', icon: Info, description: 'Get video metadata' }
   ];
 
-  // Effect to reset transcript options when selectedOutput changes
   useEffect(() => {
     if (selectedOutput !== 'transcript') {
       setTranscriptLang('tr');
       setTranscriptSkipAI(false);
-      setAiModel('deepseek'); // Reset AI model
+      setAiModel('deepseek');
     }
   }, [selectedOutput]);
 
@@ -87,454 +77,269 @@ const Index = () => {
     return regex.test(url);
   };
 
-  // Unified sidebar opening logic (from DashboardPage)
-  const openSidebarForAction = (title: string) => {
-    console.log('[IndexPage] openSidebarForAction called. Title:', title);
+  const openSidebarForAction = (title: string, data: ProcessSidebarData | null = null) => {
     setSidebarTitle(title);
-    setSidebarData(null); // Clear previous data
-    setErrorForSidebar(null); // Clear previous error
-    // setShowReopenButton(false); // No longer needed here, managed by useEffect
+    setSidebarData(data);
+    setErrorForSidebar(null);
     setIsSidebarOpen(true);
-    console.log('[IndexPage] setIsSidebarOpen(true) - state should be updated.');
   };
 
   const handleSidebarOpenChange = (isOpen: boolean) => {
     setIsSidebarOpen(isOpen);
-    // setShowReopenButton(!isOpen); // Simplified logic, but useEffect is better for direct state->state updates
-
-    // Still need to handle activeBlobUrl revocation when sidebar closes
     if (!isOpen && activeBlobUrl) {
-      console.log('[IndexPage] Sidebar closed, revoking active blob URL:', activeBlobUrl);
       URL.revokeObjectURL(activeBlobUrl);
       setActiveBlobUrl(null);
     }
   };
 
-  // Effect to manage the reopen button visibility based on sidebar state
   useEffect(() => {
     setShowReopenButton(!isSidebarOpen);
   }, [isSidebarOpen]);
 
-  // --- React Query Mutations (from DashboardPage) ---
-
   const infoMutation = useMutation<videoApi.VideoInfo, Error, string>({
-    mutationFn: (videoUrl: string) => {
-      console.log('[IndexPage] infoMutation.mutationFn called with url:', videoUrl);
-      return videoApi.getVideoInfo(videoUrl);
-    },
+    mutationFn: videoApi.getVideoInfo,
     onSuccess: (data) => {
-      console.log('[IndexPage] Info Mutation onSuccess. Data:', data);
       setSidebarTitle("Video Information");
-      setSidebarData(data);
+      const displayData = {
+        title: data.title,
+        video_id: data.video_id,
+        channel_name: data.channel_name,
+        post_date: data.post_date,
+        originalUrl: url,
+      };
+      setSidebarData(displayData);
       setErrorForSidebar(null);
-      console.log('[IndexPage] Info Mutation onSuccess - sidebar state updated.');
     },
     onError: (error) => {
-      console.error('[IndexPage] Info Mutation onError. Error:', error);
       setSidebarTitle("Error Fetching Info");
       setErrorForSidebar(error.message || "An unknown error occurred.");
-      setSidebarData(null);
-      console.log('[IndexPage] Info Mutation onError - sidebar state updated for error.');
+      setSidebarData({ originalUrl: url });
     },
   });
 
   type DownloadArgs = { url: string; format: 'mp3' | 'mp4' };
 
   const downloadFileMutation = useMutation<Blob, Error, DownloadArgs>({
-    mutationFn: (args: DownloadArgs) => {
-      console.log('[IndexPage] downloadFileMutation.mutationFn called with args:', args);
-      return args.format === 'mp3'
-        ? videoApi.downloadMp3(args.url)
-        : videoApi.downloadMp4(args.url);
-    },
+    mutationFn: (args) => (args.format === 'mp3' ? videoApi.downloadMp3(args.url) : videoApi.downloadMp4(args.url)),
     onSuccess: (blob, variables) => {
-      console.log(`[IndexPage] Download ${variables.format.toUpperCase()} Mutation onSuccess`);
       const link = document.createElement('a');
       link.href = URL.createObjectURL(blob);
       const videoIdMatch = variables.url.match(/[?&]v=([^&]+)/);
-      const fileName = videoIdMatch
-        ? `${videoIdMatch[1]}.${variables.format}`
-        : `video.${variables.format}`;
+      const fileName = videoIdMatch ? `${videoIdMatch[1]}.${variables.format}` : `video.${variables.format}`;
       link.download = fileName;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      // URL.revokeObjectURL(link.href); // Don't revoke immediately, keep for player
 
-      // Revoke previous blob URL if one exists
       if (activeBlobUrl) {
         URL.revokeObjectURL(activeBlobUrl);
-        console.log('[IndexPage] Revoked previous active blob URL:', activeBlobUrl);
       }
-      setActiveBlobUrl(link.href); // Store the new blob URL
+      setActiveBlobUrl(link.href);
 
       setSidebarTitle(`${variables.format.toUpperCase()} Ready`);
       setSidebarData({
         message: `${variables.format.toUpperCase()} is ready. Download has started. You can also play it here.`,
         fileName,
-        mediaUrl: link.href, // Pass the blob URL to the sidebar
+        mediaUrl: link.href,
         mediaType: variables.format === 'mp3' ? 'audio/mpeg' : 'video/mp4',
+        originalUrl: variables.url,
       });
       setErrorForSidebar(null);
     },
     onError: (error, variables) => {
-      if (activeBlobUrl) { // Clean up blob URL on error too
+      if (activeBlobUrl) {
         URL.revokeObjectURL(activeBlobUrl);
         setActiveBlobUrl(null);
       }
-      console.error(`[IndexPage] Download ${variables.format.toUpperCase()} Mutation onError:`, error);
       setSidebarTitle(`Error Downloading ${variables.format.toUpperCase()}`);
       setErrorForSidebar(error.message || "An unknown error occurred.");
-      setSidebarData(null);
+      setSidebarData({ originalUrl: variables.url });
     },
   });
 
-  // Type guard to check if response is AsyncJobResponse
-  function isAsyncJobResponse(response: unknown): response is AsyncJobResponse {
-    // Check if response is an object and has processingId property
+  // Type guard to check if response is AsyncJobResponse (moved here)
+  const isAsyncJobResponse = (response: unknown): response is AsyncJobResponse => {
     return typeof response === 'object' && response !== null && 'processingId' in response && typeof (response as AsyncJobResponse).processingId === 'string';
-  }
+  };
 
-  // Define type for transcript mutation arguments
   type TranscriptMutationArgs = {
     videoUrl: string;
     lang: string;
     skipAI: boolean;
-  useDeepSeek: boolean; // Corrected: API expects a boolean for useDeepSeek
+    useDeepSeek: boolean;
   };
 
-  const transcriptMutation = useMutation<
-    TranscriptResponse | AsyncJobResponse,
-    Error,
-    TranscriptMutationArgs
-  >({
-    mutationFn: (args: TranscriptMutationArgs) => {
-      console.log('[IndexPage] transcriptMutation.mutationFn called with args:', args);
-    // Call with useDeepSeek boolean, videoApi.ts handles conditional query param
-    return videoApi.getVideoTranscript(args.videoUrl, args.lang, args.skipAI, args.useDeepSeek);
-    },
-    onSuccess: (data, variables) => { // Added variables here
-      console.log('[IndexPage] Transcript Mutation onSuccess:', data);
+  const transcriptMutation = useMutation<TranscriptResponse | AsyncJobResponse, Error, TranscriptMutationArgs>({
+    mutationFn: (args) => videoApi.getVideoTranscript(args.videoUrl, args.lang, args.skipAI, args.useDeepSeek),
+    onSuccess: (data, variables) => {
       setErrorForSidebar(null);
-      setCurrentProcessingId(null); // Clear any previous processing ID
+      setCurrentProcessingId(null);
 
-      // Include used parameters in sidebarData
       const baseSidebarData = {
         originalUrl: variables.videoUrl,
         requestedLang: variables.lang,
         requestedSkipAI: variables.skipAI,
-        // requestedUseDeepSeek: variables.useDeepSeek, // This was for the boolean
-        requestedAiModel: aiModel, // Pass the string "deepseek" or "qwen" for display
+        requestedAiModel: aiModel,
       };
 
       if (isAsyncJobResponse(data)) {
         setSidebarTitle("Transcript Processing Started");
         setSidebarData({
           ...baseSidebarData,
-          message: data.message,
-          processingId: data.processingId,
-          progressEndpoint: data.progressEndpoint,
-          resultEndpoint: data.resultEndpoint,
-          status: "processing_initiated", // Custom status
+          ...data,
+          status: "processing_initiated",
         });
-        setCurrentProcessingId(data.processingId); // Start polling for this ID
-        console.log(`[IndexPage] Transcript is async. Processing ID: ${data.processingId}`);
+        setCurrentProcessingId(data.processingId);
       } else {
-        // Direct response (TranscriptResponse)
         setSidebarTitle("Video Transcript");
-        setSidebarData({ ...baseSidebarData, ...data });
-        console.log('[IndexPage] Transcript received directly.');
+        setSidebarData({ ...baseSidebarData, ...data, status: "final_result_displayed", progress: 100 });
       }
     },
-    onError: (error, variables) => { // Added variables here
-      console.error('[IndexPage] Transcript Mutation onError:', error);
-      setCurrentProcessingId(null); // Stop polling on error
+    onError: (error, variables) => {
+      setCurrentProcessingId(null);
       setSidebarTitle("Error Fetching Transcript");
       setErrorForSidebar(error.message || "An unknown error occurred.");
-      // Also include parameters in sidebarData on error, so user knows what failed
       setSidebarData({
         originalUrl: variables.videoUrl,
         requestedLang: variables.lang,
         requestedSkipAI: variables.skipAI,
-        // requestedUseDeepSeek: variables.useDeepSeek, // This was for the boolean
-        requestedAiModel: aiModel, // Pass the string "deepseek" or "qwen" for display
+        requestedAiModel: aiModel,
+        status: "failed",
       });
     },
   });
 
-  // Composite loading state for disabling form elements / showing processing
-  // isProcessing should be true if any mutation is pending OR if we are actively polling.
-  const isAnyMutationPending = infoMutation.isPending || downloadFileMutation.isPending || transcriptMutation.isPending;
-  const isPollingActive = !!currentProcessingId;
-  const [jobIdForResults, setJobIdForResults] = useState<string | null>(null);
-
-
-  // --- Query for Polling Progress ---
-  const { data: progressData, error: progressError, isLoading: isProgressLoading } = useQuery<ProgressResponse | null, Error>({
+  const { data: progressData, error: progressError } = useQuery<ProgressResponse | null, Error>({
     queryKey: ['progress', currentProcessingId],
     queryFn: async () => {
       if (!currentProcessingId) return null;
-      console.log(`[IndexPage] Polling progress for ${currentProcessingId}`);
       const progress = await videoApi.getProcessingProgress(currentProcessingId);
-      setSidebarData(prevData => ({
-        ...prevData, // Spread existing data first
-        status: progress.status,
-        progress: progress.progress,
-        video_title: progress.video_title,
-        lastUpdated: new Date().toLocaleTimeString(),
-        message: `Status: ${progress.status}, Progress: ${progress.progress}%`,
-        jobId: progress.id, // Ensure jobId is in sidebarData for result query
-        // originalUrl will be preserved if already in prevData, or set initially when transcriptMutation runs
-        originalUrl: prevData?.originalUrl || url, // Ensure originalUrl is maintained or set
-      }));
-      setErrorForSidebar(null);
-
-      if (progress.status === 'completed' || progress.status === 'failed' || progress.progress === 100) {
-        console.log(`[IndexPage] Progress for ${currentProcessingId} is ${progress.status} at ${progress.progress}%.`);
-        // Stop this progress query
-        queryClient.invalidateQueries({ queryKey: ['progress', currentProcessingId] });
-
-        if (progress.status === 'completed' || (progress.status !== 'failed' && progress.progress === 100)) {
-          setSidebarTitle("Finalizing Result...");
-          setSidebarData(prev => ({ ...prev, status: "finalizing", message: "Progress complete. Fetching final result..."}));
-          setJobIdForResults(currentProcessingId); // Enable result query
-        } else { // Failed status from progress
-          setSidebarTitle("Processing Failed");
-          setErrorForSidebar(`Processing failed with status: ${progress.status}`);
-          setSidebarData(prevData => ({
-            ...(typeof prevData === 'object' ? prevData : {}),
-            status: "processing_failed",
-            message: `Error: Processing failed. Status: ${progress.status}`,
-          }));
-        }
-        setCurrentProcessingId(null); // Clear currentProcessingId to stop this query's refetch interval
-      }
+      setSidebarData(prevData => ({ ...prevData, ...progress }));
       return progress;
     },
     enabled: !!currentProcessingId,
     refetchInterval: (query) => {
-      // Check if query.state.data exists and is of type ProgressResponse
       const data = query.state.data as ProgressResponse | null;
       if (!currentProcessingId || (data && (data.status === 'completed' || data.status === 'failed' || data.progress === 100))) {
-        return false; // Stop polling
+        return false;
       }
-      return 5000; // Poll every 5 seconds
+      return 5000;
     },
     refetchIntervalInBackground: true,
     refetchOnWindowFocus: false,
-    // onError callback removed, will be handled by useEffect
   });
 
   useEffect(() => {
-    if (progressError) {
-      console.error(`[IndexPage] Error polling progress for ${currentProcessingId}:`, progressError);
-      setErrorForSidebar(progressError.message || "Error fetching progress.");
-      // Consider stopping polling on certain errors by setCurrentProcessingId(null)
+    if (progressData && (progressData.status === 'completed' || progressData.status === 'failed' || progressData.progress === 100)) {
+      queryClient.invalidateQueries({ queryKey: ['progress', currentProcessingId] });
+      if (progressData.status === 'completed' || (progressData.status !== 'failed' && progressData.progress === 100)) {
+        setSidebarTitle("Finalizing Result...");
+        setSidebarData(prev => ({ ...prev, status: "finalizing" }));
+        setJobIdForResults(currentProcessingId);
+      } else {
+        setSidebarTitle("Processing Failed");
+        setErrorForSidebar(`Processing failed with status: ${progressData.status}`);
+        setSidebarData(prevData => ({ ...prevData, status: "processing_failed" }));
+      }
+      setCurrentProcessingId(null);
     }
-  }, [progressError, currentProcessingId]);
+  }, [progressData, currentProcessingId, queryClient]);
 
-  // --- Query for Fetching Final Result ---
-  const { data: resultData, error: resultError, isLoading: isResultLoading, isFetching: isResultFetching } = useQuery<TranscriptResponse, Error>({
+  useEffect(() => {
+    if (progressError) {
+      setErrorForSidebar(progressError.message || "Error fetching progress.");
+    }
+  }, [progressError]);
+
+  const { data: resultData, error: resultError } = useQuery<TranscriptResponse, Error>({
     queryKey: ['result', jobIdForResults],
     queryFn: async () => {
       if (!jobIdForResults) throw new Error("Job ID for result is missing.");
-      console.log(`[IndexPage] Fetching result for ${jobIdForResults}`);
       setSidebarTitle("Fetching Final Result...");
-      setSidebarData(prev => ({ ...prev, status: "fetching_result", message: "Fetching final result details..."}));
+      setSidebarData(prev => ({ ...prev, status: "fetching_result" }));
       return videoApi.getProcessingResult(jobIdForResults);
     },
     enabled: !!jobIdForResults,
     retry: (failureCount, error) => {
       if (error instanceof StillProcessingError) {
-        console.log(`[IndexPage] Result for ${jobIdForResults} still processing (Attempt ${failureCount + 1}). Status: ${error.status}, Progress: ${error.progress}. Retrying...`);
-        setSidebarData(prev => ({
-          ...prev,
-          status: error.status || "finalizing_still",
-          progress: error.progress,
-          message: `Result finalization is taking a bit longer. Status: ${error.status}, Progress: ${error.progress}%. Waiting...`,
-        }));
-        return failureCount < 10; // Increased retries to 10 for StillProcessingError
+          return failureCount < 10;
       }
-      return failureCount < 2; // Default retry for other errors (e.g., network issues)
+      return failureCount < 2;
     },
     retryDelay: (attemptIndex, error) => {
         if (error instanceof StillProcessingError) {
-            return Math.min(attemptIndex * 2000, 10000); // e.g., 0s, 2s, 4s, 6s, 8s, up to 10s
+            return Math.min(attemptIndex * 2000, 10000);
         }
-        return attemptIndex * 1000; // Standard backoff for other errors
+        return attemptIndex * 1000;
     },
-    // onSuccess and onError callbacks removed, will be handled by useEffect
   });
 
   useEffect(() => {
     if (resultData) {
-      console.log(`[IndexPage] Result fetched successfully for job ${jobIdForResults}. Data:`, resultData);
-      setSidebarData(prevData => {
-        // Preserve relevant fields from prevData, especially initial request parameters
-        const preservedData: Partial<ProcessSidebarData> = {
-          originalUrl: prevData?.originalUrl,
-          requestedLang: prevData?.requestedLang,
-          requestedSkipAI: prevData?.requestedSkipAI,
-            requestedAiModel: prevData?.requestedAiModel, // Persist AI model
-          video_title: prevData?.video_title || resultData.title, // Prefer fresh title, fallback to previous
-          lastUpdated: prevData?.lastUpdated, // Can keep lastUpdated from polling
-        };
-
-        const newFinalResultData: ProcessSidebarData = {
-          ...preservedData, // Spread the preserved fields first
-
-          // Fields from TranscriptResponse (API result)
-          success: resultData.success,
-          title: resultData.title, // Overwrite video_title if resultData.title is fresher
-          language: resultData.language,
-          transcript: resultData.transcript,
-          ai_notes: resultData.ai_notes,
-          isProcessed: resultData.isProcessed,
-          processor: resultData.processor,
-          video_id: resultData.video_id,
-          channel_id: resultData.channel_id,
-          channel_name: resultData.channel_name,
-          post_date: resultData.post_date,
-
-          // Frontend specific status for ProcessSidebar
-          status: "final_result_displayed",
-
-          // Explicitly clear/reset fields related to polling/async process
-          // to ensure ProcessSidebar transitions correctly out of polling display
-          processingId: undefined,
-          progress: undefined, // Clear progress percentage
-          message: "Transcript successfully loaded.", // Set a success message or clear
-          progressEndpoint: undefined,
-          resultEndpoint: undefined,
-          // mediaUrl, mediaType, fileName should be undefined if not set by this result type
-        };
-        console.log('[IndexPage] Setting newFinalResultData to sidebar:', newFinalResultData);
-        return newFinalResultData;
-      });
-
+      setSidebarData(prevData => ({
+        ...prevData,
+        ...resultData,
+        status: "final_result_displayed",
+        progress: 100,
+        // Ensure processingId is kept to maintain timer display
+        processingId: prevData?.processingId || (isAsyncJobResponse(resultData) ? resultData.processingId : undefined),
+      }));
       setSidebarTitle("Transcript Result");
       setErrorForSidebar(null);
-      setJobIdForResults(null); // Stop further queries for this job
-      if (jobIdForResults) { // Ensure jobIdForResults was not already null
-        queryClient.invalidateQueries({ queryKey: ['result', jobIdForResults] });
-      }
+      setJobIdForResults(null);
+      queryClient.invalidateQueries({ queryKey: ['result', jobIdForResults] });
     }
-  }, [resultData, jobIdForResults, queryClient]); // queryClient was already a dependency
+  }, [resultData, jobIdForResults, queryClient]);
 
   useEffect(() => {
     if (resultError) {
-      console.error(`[IndexPage] Error fetching result for ${jobIdForResults}:`, resultError);
-      if (!(resultError instanceof StillProcessingError)) {
-        setSidebarTitle("Error Fetching Result");
-        setErrorForSidebar(resultError.message || "Failed to get final result.");
-        setSidebarData(prevData => ({
-          ...(typeof prevData === 'object' ? prevData : {}),
-          status: "result_error",
-          message: `Failed to retrieve result: ${resultError.message}`,
-        }));
-      } else {
-        setSidebarTitle("Error Fetching Result");
-        setErrorForSidebar(`Result not available after multiple retries. Last status: ${resultError.status}, Progress: ${resultError.progress}%`);
-        setSidebarData(prevData => ({
-          ...(typeof prevData === 'object' ? prevData : {}),
-          status: "result_error_timeout",
-          message: `Result not available after multiple retries. Last status: ${resultError.status}, Progress: ${resultError.progress}%`,
-        }));
-      }
-      // setJobIdForResults(null); // Optionally clear to stop further attempts on final error
+      setErrorForSidebar(resultError.message || "Failed to get final result.");
+      setSidebarData(prevData => ({ ...prevData, status: "result_error" }));
     }
-  }, [resultError, jobIdForResults]);
+  }, [resultError]);
 
-
-  const isProcessing = isAnyMutationPending || isPollingActive || isResultLoading || isResultFetching;
-  // More refined sidebar loading state
-  const isSidebarLoading =
-    infoMutation.isPending ||
-    downloadFileMutation.isPending ||
-    transcriptMutation.isPending ||
-    (isPollingActive && isProgressLoading && !progressData) || // Loading progress initially
-    (!!jobIdForResults && (isResultLoading || isResultFetching) && !resultData); // Loading result initially or during retries
-
-
-  useEffect(() => {
-    // This effect is primarily for cleaning up blob URLs.
-    // Error display for progress and result queries is handled by their respective onError callbacks.
-    return () => {
-      if (activeBlobUrl) {
-        console.log('[IndexPage] Unmounting or new process, revoking active blob URL:', activeBlobUrl);
-        URL.revokeObjectURL(activeBlobUrl);
-        // setActiveBlobUrl(null); // Avoid setting state in cleanup if it causes loops; primary setActiveBlobUrl(null) calls are elsewhere
-      }
-    };
-  }, [activeBlobUrl]); // Added activeBlobUrl to dependency array
+  const isProcessing = infoMutation.isPending || downloadFileMutation.isPending || transcriptMutation.isPending || !!currentProcessingId || !!jobIdForResults;
+  const isSidebarLoading = isProcessing;
 
   const handleProcess = () => {
-    // Clear previous polling/result states if a new process is started
     setCurrentProcessingId(null);
     setJobIdForResults(null);
     queryClient.removeQueries({ queryKey: ['progress'] });
     queryClient.removeQueries({ queryKey: ['result'] });
 
-    // Revoke any existing blob URL when a new process starts
     if (activeBlobUrl) {
-      console.log('[IndexPage] New process started, revoking active blob URL:', activeBlobUrl);
       URL.revokeObjectURL(activeBlobUrl);
       setActiveBlobUrl(null);
     }
 
-    // The duplicated if (!user) block was removed from here.
-    // The first if (!user) block starting around line 313 is the correct one.
-
-    if (!url.trim()) {
-      toast({ title: "URL Required", description: "Please enter a YouTube URL", variant: "destructive" });
-      return;
-    }
-
-    if (!isValidYouTubeUrl(url)) {
+    if (!url.trim() || !isValidYouTubeUrl(url)) {
       toast({ title: "Invalid URL", description: "Please enter a valid YouTube URL", variant: "destructive" });
       return;
     }
-
     if (!selectedOutput) {
       toast({ title: "Output Type Required", description: "Please select an output type", variant: "destructive" });
       return;
     }
 
-    // Trigger the appropriate mutation based on selectedOutput
+    const initialData = { originalUrl: url, status: 'initiated', progress: 0 };
+    openSidebarForAction(`Preparing ${selectedOutput.toUpperCase()}...`, initialData);
+
     switch (selectedOutput) {
       case 'info':
-        openSidebarForAction("Fetching Video Information...");
         infoMutation.mutate(url);
         break;
       case 'mp3':
-        openSidebarForAction("Preparing MP3 Download...");
         downloadFileMutation.mutate({ url, format: 'mp3' });
         break;
       case 'mp4':
-        openSidebarForAction("Preparing MP4 Download...");
         downloadFileMutation.mutate({ url, format: 'mp4' });
         break;
       case 'transcript':
-        openSidebarForAction("Fetching Transcript...");
-        transcriptMutation.mutate({
-          videoUrl: url,
-          lang: transcriptLang,
-          skipAI: transcriptSkipAI,
-          // Determine the boolean for useDeepSeek based on aiModel state
-          // This boolean is passed to videoApi.getVideoTranscript
-          // videoApi.ts will handle not sending the param if skipAI is true
-          useDeepSeek: aiModel === 'deepseek',
-        });
+        transcriptMutation.mutate({ videoUrl: url, lang: transcriptLang, skipAI: transcriptSkipAI, useDeepSeek: aiModel === 'deepseek' });
         break;
       default:
-        console.error("Unknown output type:", selectedOutput);
         toast({ title: "Error", description: "Invalid output type selected.", variant: "destructive" });
-        return;
     }
-    
-    // No longer using a generic toast for "Processing Started" here,
-    // as sidebar will show detailed status.
-    // The individual mutation's onSuccess/onError will handle specific feedback.
   };
 
   return (
@@ -542,7 +347,6 @@ const Index = () => {
       <Navbar />
       
       <div className="flex-1 flex items-center justify-center p-4">
-        {/* Animated background elements */}
         <div className="absolute inset-0 overflow-hidden">
           <div className="absolute -top-40 -right-40 w-80 h-80 bg-gray-700 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-pulse"></div>
           <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-slate-600 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-pulse delay-1000"></div>
@@ -551,7 +355,6 @@ const Index = () => {
 
         <Card className="w-full max-w-2xl bg-gray-800/20 backdrop-blur-lg border-gray-700/30 shadow-2xl relative z-10">
           <div className="p-8 space-y-8">
-            {/* Header */}
             <div className="text-center space-y-4">
               <div className="flex items-center justify-center space-x-3">
                 <div className="p-3 bg-red-500 rounded-full">
@@ -562,64 +365,27 @@ const Index = () => {
               <p className="text-gray-300 text-lg">Convert YouTube videos to MP3, MP4, get AI generated transcripts or video info</p>
             </div>
 
-            {/* URL Input */}
             <div className="space-y-3">
               <label className="text-gray-200 font-medium block">YouTube URL</label>
-              <Input
-                type="url"
-                placeholder="Paste YouTube URL here (e.g., https://youtube.com/watch?v=...)"
-                value={url}
-                onChange={(e) => setUrl(e.target.value)}
-                disabled={isProcessing} // Disable input while processing
-                className="bg-gray-800/30 border-gray-600/50 text-gray-100 placeholder:text-gray-400 h-12 text-lg backdrop-blur-sm focus:bg-gray-800/50 focus:border-gray-500 transition-all duration-300"
-              />
+              <Input type="url" placeholder="Paste YouTube URL here (e.g., https://youtube.com/watch?v=...)" value={url} onChange={(e) => setUrl(e.target.value)} disabled={isProcessing} className="bg-gray-800/30 border-gray-600/50 text-gray-100 placeholder:text-gray-400 h-12 text-lg backdrop-blur-sm focus:bg-gray-800/50 focus:border-gray-500 transition-all duration-300" />
             </div>
 
-            {/* Output Type Selection */}
             <div className="space-y-4">
               <label className="text-gray-200 font-medium block">Choose Output Type</label>
               <div className="grid grid-cols-2 gap-4">
                 {outputOptions.map((option) => {
                   const IconComponent = option.icon;
                   return (
-                    <button
-                      key={option.id}
-                      onClick={() => {
-                        if (!isProcessing) {
-                          setSelectedOutput(option.id);
-                        }
-                      }}
-                      disabled={isProcessing} // Disable button while processing
-                      className={`p-4 rounded-lg border-2 transition-all duration-300 text-left group hover:scale-105 relative ${
-                        selectedOutput === option.id
-                          ? 'border-gray-400 bg-gray-700/40 shadow-lg shadow-gray-700/25'
-                          : 'border-gray-600/40 bg-gray-800/20 hover:border-gray-500/60 hover:bg-gray-700/30'
-                      } ${isProcessing ? 'opacity-50 cursor-not-allowed' : ''}`}
-                    >
-                      {option.isAI && (
-                        <div className="absolute -top-2 -right-2 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full p-1 animate-pulse">
-                          <Sparkles className="w-4 h-4 text-white" />
-                        </div>
-                      )}
-                      {/* Flex container for icon and text, responsive layout */}
+                    <button key={option.id} onClick={() => !isProcessing && setSelectedOutput(option.id)} disabled={isProcessing} className={`p-4 rounded-lg border-2 transition-all duration-300 text-left group hover:scale-105 relative ${selectedOutput === option.id ? 'border-gray-400 bg-gray-700/40 shadow-lg shadow-gray-700/25' : 'border-gray-600/40 bg-gray-800/20 hover:border-gray-500/60 hover:bg-gray-700/30'} ${isProcessing ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                      {option.isAI && <div className="absolute -top-2 -right-2 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full p-1 animate-pulse"><Sparkles className="w-4 h-4 text-white" /></div>}
                       <div className="flex flex-col items-center space-y-2 md:flex-row md:items-start md:space-y-0 md:space-x-3 text-center md:text-left">
-                        {/* Icon container */}
-                        <div className={`p-2 rounded-lg transition-colors ${
-                          selectedOutput === option.id ? 'bg-rose-600' : 'bg-rose-700/60 group-hover:bg-rose-600/80'
-                        }`}>
-                          <IconComponent className="w-6 h-6 md:w-5 md:h-5 text-gray-100" /> {/* Slightly larger icon on mobile */}
-                        </div>
-                        {/* Text container */}
+                        <div className={`p-2 rounded-lg transition-colors ${selectedOutput === option.id ? 'bg-rose-600' : 'bg-rose-700/60 group-hover:bg-rose-600/80'}`}><IconComponent className="w-6 h-6 md:w-5 md:h-5 text-gray-100" /></div>
                         <div className="flex-1">
                           <div className="flex flex-col items-center md:flex-row md:items-center space-y-1 md:space-y-0 md:space-x-2">
-                            <h3 className="text-gray-100 font-semibold break-words">{option.label}</h3> {/* Added break-words for better wrapping */}
-                            {option.isAI && (
-                              <span className="text-xs bg-gradient-to-r from-blue-500 to-purple-600 text-white px-2 py-1 rounded-full font-medium">
-                                AI
-                              </span>
-                            )}
+                            <h3 className="text-gray-100 font-semibold break-words">{option.label}</h3>
+                            {option.isAI && <span className="text-xs bg-gradient-to-r from-blue-500 to-purple-600 text-white px-2 py-1 rounded-full font-medium">AI</span>}
                           </div>
-                          <p className="text-gray-400 text-sm mt-1 break-words">{option.description}</p> {/* Added break-words for better wrapping */}
+                          <p className="text-gray-400 text-sm mt-1 break-words">{option.description}</p>
                         </div>
                       </div>
                     </button>
@@ -628,68 +394,34 @@ const Index = () => {
               </div>
             </div>
 
-            {/* AI Transcript Options */}
             {selectedOutput === 'transcript' && (
               <div className="space-y-6 p-6 bg-gray-800/30 border border-gray-700/40 rounded-lg shadow-md mt-6">
                 <h3 className="text-lg font-semibold text-gray-100 mb-4 border-b border-gray-600/50 pb-3">AI Transcript Options</h3>
-
-                {/* Language Selection */}
                 <div className="space-y-2">
                   <Label htmlFor="transcript-lang" className="text-gray-300 font-medium">Language</Label>
-                  <Select
-                    value={transcriptLang}
-                    onValueChange={setTranscriptLang}
-                    disabled={isProcessing}
-                  >
-                    <SelectTrigger id="transcript-lang" className="w-full bg-gray-700/50 border-gray-600 text-gray-100 focus:bg-gray-700 focus:border-gray-500">
-                      <SelectValue placeholder="Select language" />
-                    </SelectTrigger>
+                  <Select value={transcriptLang} onValueChange={setTranscriptLang} disabled={isProcessing}>
+                    <SelectTrigger id="transcript-lang" className="w-full bg-gray-700/50 border-gray-600 text-gray-100 focus:bg-gray-700 focus:border-gray-500"><SelectValue placeholder="Select language" /></SelectTrigger>
                     <SelectContent className="bg-gray-800 border-gray-700 text-gray-100">
-                      {transcriptLanguages.map(lang => (
-                        <SelectItem key={lang.value} value={lang.value} className="hover:bg-gray-700 focus:bg-gray-700">
-                          {lang.label}
-                        </SelectItem>
-                      ))}
+                      {transcriptLanguages.map(lang => <SelectItem key={lang.value} value={lang.value} className="hover:bg-gray-700 focus:bg-gray-700">{lang.label}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
-
-                {/* Skip AI Checkbox */}
                 <div className="flex items-center space-x-3 pt-2">
-                  <Checkbox
-                    id="skip-ai"
-                    checked={transcriptSkipAI}
-                    onCheckedChange={(checked) => setTranscriptSkipAI(checked as boolean)}
-                    disabled={isProcessing}
-                    className="border-gray-500 data-[state=checked]:bg-blue-500 data-[state=checked]:border-blue-500 focus-visible:ring-blue-400"
-                  />
-                  <Label htmlFor="skip-ai" className="text-gray-300 font-medium cursor-pointer">
-                    Skip AI Post-processing (Plain Transcript)
-                  </Label>
+                  <Checkbox id="skip-ai" checked={transcriptSkipAI} onCheckedChange={(checked) => setTranscriptSkipAI(checked as boolean)} disabled={isProcessing} className="border-gray-500 data-[state=checked]:bg-blue-500 data-[state=checked]:border-blue-500 focus-visible:ring-blue-400" />
+                  <Label htmlFor="skip-ai" className="text-gray-300 font-medium cursor-pointer">Skip AI Post-processing (Plain Transcript)</Label>
                 </div>
-
-                {/* AI Model Selection Radio Group */}
                 {!transcriptSkipAI && (
                   <div className="space-y-3 pt-4">
                     <Label className="text-gray-300 font-medium">Select AI Model</Label>
-                    <RadioGroup
-                      value={aiModel}
-                      onValueChange={setAiModel}
-                      className="space-y-2"
-                      disabled={isProcessing}
-                    >
+                    <RadioGroup value={aiModel} onValueChange={setAiModel} className="space-y-2" disabled={isProcessing}>
                       <div className="flex items-center space-x-3">
                         <RadioGroupItem value="deepseek" id="deepseek-model" className="border-gray-500 data-[state=checked]:border-purple-500 data-[state=checked]:text-purple-500 focus-visible:ring-purple-400"/>
-                        <Label htmlFor="deepseek-model" className="text-gray-300 font-normal cursor-pointer">
-                          DeepSeek
-                        </Label>
+                        <Label htmlFor="deepseek-model" className="text-gray-300 font-normal cursor-pointer">DeepSeek</Label>
                       </div>
                       <p className="text-xs text-gray-400 ml-7">Slower, but generally more stable and accurate results.</p>
                       <div className="flex items-center space-x-3 pt-2">
                         <RadioGroupItem value="qwen" id="qwen-model" className="border-gray-500 data-[state=checked]:border-teal-500 data-[state=checked]:text-teal-500 focus-visible:ring-teal-400"/>
-                        <Label htmlFor="qwen-model" className="text-gray-300 font-normal cursor-pointer">
-                          Qwen
-                        </Label>
+                        <Label htmlFor="qwen-model" className="text-gray-300 font-normal cursor-pointer">Qwen</Label>
                       </div>
                       <p className="text-xs text-gray-400 ml-7">Faster, but can be less predictable for some content.</p>
                     </RadioGroup>
@@ -698,111 +430,39 @@ const Index = () => {
               </div>
             )}
 
-            {/* Process Button */}
-            <div className="relative pt-4"> {/* Added pt-4 for spacing if AI options are shown */}
-              <Button
-                onClick={handleProcess}
-                disabled={isProcessing || !url || !selectedOutput} // Disable if processing, or no URL/output selected
-                className="w-full h-16 bg-gradient-to-r from-blue-600 via-purple-600 to-blue-700 hover:from-blue-500 hover:via-purple-500 hover:to-blue-600 text-white font-bold text-xl shadow-2xl hover:shadow-blue-500/25 transition-all duration-500 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none border-0 relative overflow-hidden group"
-              >
-                {/* Animated background shimmer */}
+            <div className="relative pt-4">
+              <Button onClick={handleProcess} disabled={isProcessing || !url || !selectedOutput} className="w-full h-16 bg-gradient-to-r from-blue-600 via-purple-600 to-blue-700 hover:from-blue-500 hover:via-purple-500 hover:to-blue-600 text-white font-bold text-xl shadow-2xl hover:shadow-blue-500/25 transition-all duration-500 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none border-0 relative overflow-hidden group">
                 <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -skew-x-12 transform translate-x-[-100%] group-hover:translate-x-[200%] transition-transform duration-1000"></div>
-                
                 <div className="relative flex items-center justify-center space-x-3">
-                  {isProcessing ? (
-                    <>
-                      <Loader2 className="h-6 w-6 animate-spin" />
-                      <span>Processing...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Zap className="w-7 h-7" />
-                      <span>Start Process</span>
-                      <Zap className="w-7 h-7" />
-                    </>
-                  )}
+                  {isProcessing ? <><Loader2 className="h-6 w-6 animate-spin" /><span>Processing...</span></> : <><Zap className="w-7 h-7" /><span>Start Process</span><Zap className="w-7 h-7" /></>}
                 </div>
               </Button>
-              {isProcessing && (
-                <p className="text-yellow-400 text-xs text-center mt-3 animate-pulse">
-                  A process is currently ongoing. Please wait for it to complete before starting a new one.
-                </p>
-              )}
+              {isProcessing && <p className="text-yellow-400 text-xs text-center mt-3 animate-pulse">A process is currently ongoing. Please wait for it to complete before starting a new one.</p>}
             </div>
           </div>
         </Card>
       </div>
 
-      <ProcessSidebar
-        isOpen={isSidebarOpen}
-        onOpenChange={handleSidebarOpenChange} // Use the new handler
-        title={sidebarTitle}
-        data={sidebarData} // sidebarData will now contain progress info too
-        isLoading={isSidebarLoading}
-        error={sidebarError}
-      />
+      <ProcessSidebar isOpen={isSidebarOpen} onOpenChange={handleSidebarOpenChange} title={sidebarTitle} data={sidebarData} isLoading={isSidebarLoading} error={sidebarError} />
 
-      {showReopenButton && (
-        <Button
-          onClick={() => {
-            setIsSidebarOpen(true);
-            // setShowReopenButton(false); // Logic changed: button visibility now tied to isSidebarOpen state directly via useEffect
-          }}
-          className="fixed top-1/2 right-0 -translate-y-1/2 z-50 bg-slate-600 hover:bg-slate-500 text-white p-4 rounded-l-lg shadow-xl animate-pulse border-2 border-slate-400 h-32" // Added h-32 for increased height
-          title="Reopen Sidebar"
-        >
-          <ChevronsLeft className="h-10 w-10" /> {/* Increased icon size further */}
-        </Button>
-      )}
+      {showReopenButton && <Button onClick={() => setIsSidebarOpen(true)} className="fixed top-1/2 right-0 -translate-y-1/2 z-50 bg-slate-600 hover:bg-slate-500 text-white p-4 rounded-l-lg shadow-xl animate-pulse border-2 border-slate-400 h-32" title="Reopen Sidebar"><ChevronsLeft className="h-10 w-10" /></Button>}
 
-      {/* Pricing Section Placeholder */}
       <div id="pricing" className="py-16 bg-gray-800/10 hidden">
         <div className="max-w-4xl mx-auto px-4 text-center">
           <h2 className="text-3xl font-bold text-gray-100 mb-4">Pricing</h2>
-          <p className="text-gray-300 text-lg mb-8">
-            Detailed pricing information will be available here soon.
-          </p>
-          {/* Placeholder for pricing cards or table */}
+          <p className="text-gray-300 text-lg mb-8">Detailed pricing information will be available here soon.</p>
           <div className="grid md:grid-cols-3 gap-8">
             <Card className="bg-gray-700/30 border-gray-600/50 text-gray-100">
-              <CardHeader>
-                <CardTitle>Free Tier</CardTitle>
-                <CardDescription className="text-gray-400">Basic access</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p className="text-2xl font-bold">$0<span className="text-sm text-gray-400">/month</span></p>
-                <ul className="mt-4 space-y-2 text-gray-300">
-                  <li>Feature 1</li>
-                  <li>Feature 2</li>
-                </ul>
-              </CardContent>
+              <CardHeader><CardTitle>Free Tier</CardTitle><CardDescription className="text-gray-400">Basic access</CardDescription></CardHeader>
+              <CardContent><p className="text-2xl font-bold">$0<span className="text-sm text-gray-400">/month</span></p><ul className="mt-4 space-y-2 text-gray-300"><li>Feature 1</li><li>Feature 2</li></ul></CardContent>
             </Card>
             <Card className="bg-gray-700/30 border-gray-600/50 text-gray-100">
-              <CardHeader>
-                <CardTitle>Pro Tier</CardTitle>
-                <CardDescription className="text-gray-400">More features</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p className="text-2xl font-bold">$10<span className="text-sm text-gray-400">/month</span></p>
-                <ul className="mt-4 space-y-2 text-gray-300">
-                  <li>Feature 1</li>
-                  <li>Feature 2</li>
-                  <li>Feature 3</li>
-                </ul>
-              </CardContent>
+              <CardHeader><CardTitle>Pro Tier</CardTitle><CardDescription className="text-gray-400">More features</CardDescription></CardHeader>
+              <CardContent><p className="text-2xl font-bold">$10<span className="text-sm text-gray-400">/month</span></p><ul className="mt-4 space-y-2 text-gray-300"><li>Feature 1</li><li>Feature 2</li><li>Feature 3</li></ul></CardContent>
             </Card>
             <Card className="bg-gray-700/30 border-gray-600/50 text-gray-100">
-              <CardHeader>
-                <CardTitle>Enterprise Tier</CardTitle>
-                <CardDescription className="text-gray-400">Custom solutions</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p className="text-2xl font-bold">Contact Us</p>
-                <ul className="mt-4 space-y-2 text-gray-300">
-                  <li>All Pro Features</li>
-                  <li>Dedicated Support</li>
-                </ul>
-              </CardContent>
+              <CardHeader><CardTitle>Enterprise Tier</CardTitle><CardDescription className="text-gray-400">Custom solutions</CardDescription></CardHeader>
+              <CardContent><p className="text-2xl font-bold">Contact Us</p><ul className="mt-4 space-y-2 text-gray-300"><li>All Pro Features</li><li>Dedicated Support</li></ul></CardContent>
             </Card>
           </div>
         </div>
