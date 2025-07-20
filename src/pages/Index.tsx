@@ -93,6 +93,24 @@ const Index = () => {
     }
   };
 
+  const handleJobCanceled = (processingId: string) => {
+    // Reset all processing states to beginning
+    setCurrentProcessingId(null);
+    setJobIdForResults(null);
+    setSidebarData(null);
+    setSidebarTitle("Process Details");
+    setErrorForSidebar(null);
+    
+    // Clear all related queries
+    queryClient.removeQueries({ queryKey: ['progress'] });
+    queryClient.removeQueries({ queryKey: ['result'] });
+    
+    // Reset mutations
+    infoMutation.reset();
+    downloadFileMutation.reset();
+    transcriptMutation.reset();
+  };
+
   useEffect(() => {
     setShowReopenButton(!isSidebarOpen);
   }, [isSidebarOpen]);
@@ -478,7 +496,15 @@ const Index = () => {
         </Card>
       </div>
 
-      <ProcessSidebar isOpen={isSidebarOpen} onOpenChange={handleSidebarOpenChange} title={sidebarTitle} data={sidebarData} isLoading={isSidebarLoading} error={sidebarError} />
+      <ProcessSidebar 
+        isOpen={isSidebarOpen} 
+        onOpenChange={handleSidebarOpenChange} 
+        title={sidebarTitle} 
+        data={sidebarData} 
+        isLoading={isSidebarLoading} 
+        error={sidebarError}
+        onJobCanceled={handleJobCanceled}
+      />
 
       {showReopenButton && <Button onClick={() => setIsSidebarOpen(true)} className="fixed top-1/2 right-0 -translate-y-1/2 z-50 bg-slate-600 hover:bg-slate-500 text-white p-4 rounded-l-lg shadow-xl animate-pulse border-2 border-slate-400 h-32" title="Reopen Sidebar"><ChevronsLeft className="h-10 w-10" /></Button>}
 

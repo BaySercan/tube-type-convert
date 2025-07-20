@@ -10,19 +10,18 @@ import {
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Copy, ExternalLink, InfoIcon, AlertTriangleIcon, Download, Loader2, Youtube, FileText, Clock, BrainCircuit, XCircle } from "lucide-react"; // Added XCircle
+import { Copy, ExternalLink, InfoIcon, AlertTriangleIcon, Download, Loader2, Youtube, FileText, Clock, BrainCircuit, XCircle } from "lucide-react";
 import JsonView from '@uiw/react-json-view';
 import { darkTheme } from '@uiw/react-json-view/dark';
-import { useCancelJob, CancelJobSuccessResponse } from "@/hooks/useCancelJob"; // Import useCancelJob & type
-import { useToast } from "@/components/ui/use-toast"; // Import useToast
-import { useQueryClient } from '@tanstack/react-query'; // Import useQueryClient
+import { useCancelJob } from "@/hooks/useCancelJob";
+import { useToast } from "@/components/ui/use-toast";
+import { useQueryClient } from '@tanstack/react-query';
 import { Progress } from "@/components/ui/progress";
 import { Link } from "react-router-dom";
-import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'; // Added useCallback
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { getLanguageName } from "@/lib/utils";
-import { JobStatus, JobType as VideoApiJobType } from "@/lib/videoApi"; // Renamed JobType to avoid conflict
+import { JobStatus, JobType as VideoApiJobType } from "@/lib/videoApi";
 
-// Define a more specific type for the sidebar's 'type' field
 export type SidebarJobType = VideoApiJobType | 'info';
 
 export interface SidebarData {
@@ -34,15 +33,15 @@ export interface SidebarData {
   requestedLang?: string;
   requestedSkipAI?: boolean;
   requestedAiModel?: string;
-  status?: JobStatus | string; // Updated to use JobStatus
+  status?: JobStatus | string;
   progress?: number;
   video_title?: string;
   lastUpdated?: string;
   mediaUrl?: string;
   fileName?: string;
   mediaType?: 'audio/mpeg' | 'video/mp4' | string;
-  type?: SidebarJobType; // Updated to use SidebarJobType
-  queue_position?: string; // Added for cancellation info
+  type?: SidebarJobType;
+  queue_position?: string;
   [key: string]: unknown;
 }
 
@@ -53,6 +52,7 @@ interface ProcessSidebarProps {
   data: SidebarData | null;
   isLoading?: boolean;
   error?: string | null;
+  onJobCanceled?: (processingId: string) => void;
 }
 
 const YouTubeEmbed = ({ url }: { url: string }) => {
@@ -74,7 +74,7 @@ const YouTubeEmbed = ({ url }: { url: string }) => {
   );
 };
 
-export const ProcessSidebar: React.FC<ProcessSidebarProps> = ({ isOpen, onOpenChange, title, data, isLoading = false, error = null }) => {
+export const ProcessSidebar: React.FC<ProcessSidebarProps> = ({ isOpen, onOpenChange, title, data, isLoading = false, error = null, onJobCanceled }) => {
   const funnyWaitingMessages = useMemo(() => ["Reticulating splines...", "Generating witty dialog...", "Spinning up the hamster..."], []);
   const [currentLoadingMessage, setCurrentLoadingMessage] = useState(funnyWaitingMessages[0]);
   const { toast } = useToast();
@@ -84,89 +84,63 @@ export const ProcessSidebar: React.FC<ProcessSidebarProps> = ({ isOpen, onOpenCh
   const handleCancelJobInSidebar = useCallback(async () => {
     if (!data || !data.processingId) return;
 
-    try {
-      const result = await cancelJob(data.processingId);
-
-      queryClient.setQueryData(['jobProgress', data.processingId], (oldData: SidebarData | undefined) => {
-        const currentProgress = oldData?.progress ?? data.progress ?? 0;
-        if (oldData) {
-          return {
-            ...oldData,
-            status: 'canceled' as JobStatus,
-            queue_position: result.queue_position,
-            video_title: result.video_title || oldData.video_title,
-            video_id: result.video_id || (oldData as any).video_id, // Assuming video_id might be on oldData
-            progress: currentProgress, // Preserve last known progress
-          };
-        }
-        // Fallback if no oldData in cache, construct from current sidebar data + cancel result
-        return {
-          ...data,
-          status: 'canceled' as JobStatus,
-          queue_position: result.queue_position,
-          video_title: result.video_title || data.video_title,
-          // video_id might not be directly on SidebarData, needs careful handling or ensure parent provides it
-        };
-      });
-
-      // Also, if the parent component that controls `ProcessSidebar`'s `data` prop
-      // has its own state update mechanism (e.g. if not using react-query for this specific data),
-      // a callback prop like `onJobUpdate` would be needed here.
-      // For now, relying on react-query cache update.
-
-      toast({
-        title: "Job Cancellation",
-        description: `${result.message}. Title: ${result.video_title || data.video_title || 'N/A'}. ${result.queue_position || ''}`,
-        variant: "default",
-      });
-
-    } catch (error: any) {
-      toast({
-        title: "Cancellation Error",
-        description: error.message || "Could not cancel the job from sidebar.",
-        variant: "destructive",
-      });
+    if (onJobCanceled) {
+      onJobCanceled(data.processingId);
     }
-  }, [data, cancelJob, toast, queryClient]);
+    
+    onOpenChange(false);
+    
+    cancelJob(data.processingId).catch(() => {});
+    
+    toast({
+      title: "Process Canceled",
+      description: "Process has been canceled. You can start a new process.",
+      variant: "default",
+    });
+  }, [data, cancelJob, toast, onJobCanceled, onOpenChange]);
 
   const [elapsedTime, setElapsedTime] = useState(0);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const startTimeRef = useRef<number | null>(null);
   const currentProcessingIdRef = useRef<string | null>(null);
+  const savedElapsedTimeRef = useRef(0);
 
   const isTranscriptRequest = useMemo(() => !!data?.requestedLang, [data]);
-  const isProcessFinished = useMemo(() => ['completed', 'failed', 'canceled', 'result_error', 'processing_failed', 'final_result_displayed', 'finalizing', 'fetching_result'].includes(data?.status || ""), [data?.status]); // Added 'canceled'
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const isPollingProgress = useMemo(() => data?.processingId && typeof data.progress === 'number' && !isProcessFinished, [data]);
+  const normalizedStatus = useMemo(() => (data?.status || "").toLowerCase(), [data?.status]);
+  
+  const isProcessFinished = useMemo(() => {
+    const finalStates = ['completed', 'failed', 'canceled', 'result_error', 'processing_failed'];
+    const status = (data?.status || '').toLowerCase();
+    return finalStates.includes(status) || data?.progress === 100;
+  }, [data?.status, data?.progress]);
+  
+  const isPollingProgress = useMemo(() => 
+    data?.processingId && typeof data.progress === 'number' && !isProcessFinished, 
+    [data, isProcessFinished]
+  );
+
+  const showCancelButton = useMemo(() => {
+    // Show cancel button for any active process that isn't finished or being canceled
+    return data?.processingId && 
+           !isProcessFinished &&
+           !isCanceling;
+  }, [data?.processingId, isProcessFinished, isCanceling]);
 
   const jsonDataForViewer = useMemo(() => {
     if (!data) return {};
-    // Define keys that are primarily for operational/frontend state, not part of the core API response data to be viewed.
     const operationalKeys = [
       'processingId', 'message', 'progressEndpoint', 'resultEndpoint',
       'status', 'progress', 'lastUpdated', 'mediaUrl', 'mediaType',
       'fileName', 'requestedLang', 'requestedSkipAI', 'requestedAiModel',
       'originalUrl', 'type', 'queue_position'
-      // 'video_title' is tricky: it's part of VideoInfo but also a top-level display field.
-      // For type 'info', data itself is VideoInfo, so video_title should be shown in JsonView.
-      // For other types (transcript, mp3, mp4 results), video_title might be metadata about the job, not the direct result.
-      // The current filter already removes 'video_title'. Let's keep it that way for simplicity,
-      // meaning if 'video_title' is a key in a 'full' info response, it will be shown by JsonView
-      // if it's not explicitly filtered here.
-      // The current filter for jsonDataForViewer removes 'video_title'.
-      // If data.type === 'info', the 'data' object IS the VideoInfo.
-      // So, we want to show its fields.
     ];
 
     if (data.type === 'info') {
-      // For 'info' type, the `data` object itself contains the information.
-      // We filter out only the operational keys that might have been added on the frontend.
       const infoSpecificOperationalKeys = ['originalUrl', 'type', 'status', 'progress', 'message', 'progressEndpoint', 'resultEndpoint', 'processingId', 'queue_position'];
       return Object.fromEntries(
         Object.entries(data).filter(([key]) => !infoSpecificOperationalKeys.includes(key))
       );
     } else {
-      // For other types, use the more general filter
       const generalOperationalKeys = ['processingId', 'message', 'progressEndpoint', 'resultEndpoint', 'status', 'progress', 'video_title', 'lastUpdated', 'mediaUrl', 'mediaType', 'fileName', 'requestedLang', 'requestedSkipAI', 'requestedAiModel', 'originalUrl', 'type', 'queue_position'];
       return Object.fromEntries(
         Object.entries(data).filter(([key]) => !generalOperationalKeys.includes(key))
@@ -183,56 +157,66 @@ export const ProcessSidebar: React.FC<ProcessSidebarProps> = ({ isOpen, onOpenCh
     return () => clearInterval(messageInterval);
   }, [isLoading, isPollingProgress, isProcessFinished, funnyWaitingMessages]);
 
-  // This is the single, definitive timer management effect.
   useEffect(() => {
-    // Condition to reset: It's a new transcript job.
-    if (isTranscriptRequest && data?.processingId && data.processingId !== currentProcessingIdRef.current) {
+    console.log('Timer effect triggered', {
+      isTranscriptRequest,
+      processingId: data?.processingId,
+      status: data?.status,
+      isProcessFinished
+    });
+
+    // Clear any existing interval first
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+
+    // Only handle timer for transcript requests with a valid processingId
+    if (isTranscriptRequest && data?.processingId) {
+      // Check if this is a new process
+      const isNewProcess = currentProcessingIdRef.current !== data.processingId;
+      
+      if (isNewProcess) {
+        // Reset timer state for new process
+        console.log('Starting new timer for process:', data.processingId);
         currentProcessingIdRef.current = data.processingId;
+        startTimeRef.current = Date.now();
         setElapsedTime(0);
-        startTimeRef.current = null; // Will be set when timer starts
-        if (intervalRef.current) {
-            clearInterval(intervalRef.current);
-            intervalRef.current = null;
-        }
-    } else if (!isTranscriptRequest) {
-      // If it's not a transcript request, ensure everything is reset.
-      currentProcessingIdRef.current = null;
-      startTimeRef.current = null;
-      setElapsedTime(0);
+      }
+
+      // Start/continue timer if process is not finished
+      if (!isProcessFinished) {
+        intervalRef.current = setInterval(() => {
+          if (startTimeRef.current) {
+            setElapsedTime(Date.now() - startTimeRef.current);
+          }
+        }, 1000);
+      }
+    }
+
+    // Cleanup function that preserves the elapsed time
+    return () => {
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
         intervalRef.current = null;
       }
-    }
-    
-    const shouldRunTimer = isTranscriptRequest && !isProcessFinished;
-
-    if (shouldRunTimer) {
-        if (intervalRef.current === null) { // Start timer only if it's not already running.
-            startTimeRef.current = startTimeRef.current ?? Date.now();
-            intervalRef.current = setInterval(() => {
-                setElapsedTime(Date.now() - (startTimeRef.current ?? Date.now()));
-            }, 1000);
-        }
-    } else { // If the timer should not be running.
-        if (intervalRef.current) {
-            clearInterval(intervalRef.current);
-            intervalRef.current = null;
-            // When the process finishes, do one last update to get the exact final time.
-            if (isProcessFinished && startTimeRef.current) {
-                setElapsedTime(Date.now() - startTimeRef.current);
-            }
-        }
-    }
-
-    // Final cleanup when the component unmounts
-    return () => {
-        if (intervalRef.current) {
-            clearInterval(intervalRef.current);
-        }
     };
-  }, [data?.processingId, isTranscriptRequest, isProcessFinished]);
+  }, [isTranscriptRequest, data?.processingId, data?.status, isProcessFinished]);
 
+
+
+  useEffect(() => {
+    console.log('Cancel button visibility', {
+      processingId: data?.processingId,
+      status: data?.status,
+      showCancelButton
+    });
+
+    // Ensure cancel button disappears after process completion
+    if (isProcessFinished) {
+      console.log('Hiding cancel button after process completion');
+    }
+  }, [data?.processingId, data?.status, showCancelButton, isProcessFinished]);
 
   const formatTime = (ms: number) => {
     const totalSeconds = Math.floor(ms / 1000);
@@ -250,7 +234,7 @@ export const ProcessSidebar: React.FC<ProcessSidebarProps> = ({ isOpen, onOpenCh
   const renderCard = (title: string, Icon: React.ElementType, content: React.ReactNode, cardClassName?: string) => (
     <Card className={`bg-slate-800/60 border-slate-700 text-slate-200 shadow-lg ${cardClassName}`}>
       <CardHeader className="flex flex-row items-center justify-between pb-2">
-        <CardTitle className="text-base font-semibold flex items-center text-white">
+        <CardTitle className="text-base font-semibold flex items text-white">
           <Icon className="w-5 h-5 mr-3 text-cyan-400" />
           {title}
         </CardTitle>
@@ -269,9 +253,6 @@ export const ProcessSidebar: React.FC<ProcessSidebarProps> = ({ isOpen, onOpenCh
     ))
   );
 
-  // Show processing status card if there's a job with a processingId (implies an ongoing or completed/failed/canceled backend process)
-  // OR if it's specifically a transcript request (which might have frontend-only states before a processingId is assigned).
-  // OR if the process is finished (which includes canceled).
   const shouldShowProcessingStatusCard = data && (data.processingId || isTranscriptRequest || isProcessFinished);
 
   const processingStatusCard = shouldShowProcessingStatusCard && (
@@ -283,22 +264,22 @@ export const ProcessSidebar: React.FC<ProcessSidebarProps> = ({ isOpen, onOpenCh
           data.status === 'failed' ? 'text-red-400' :
           data.status === 'canceled' ? 'text-gray-400' : 'text-amber-400'
         }`}>{data.status}</span></p>
-        <Progress value={data.status === 'canceled' ? (data.progress || 0) : (isProcessFinished ? 100 : data.progress || 0)} className={`w-full h-3 bg-slate-700 ${data.status === 'canceled' ? 'opacity-50' : ''}`} />
-        <p className="text-xs text-right text-slate-400">{data.status === 'canceled' ? `Canceled at ${data.progress || 0}%` : `${isProcessFinished ? 100 : data.progress || 0}% complete`}</p>
-        {data.status === 'canceled' && data.queue_position && <p className="text-xs text-center text-gray-400 pt-1">{data.queue_position}</p>}
+        <Progress value={normalizedStatus === 'canceled' ? (data.progress || 0) : (isProcessFinished ? 100 : data.progress || 0)} className={`w-full h-3 bg-slate-700 ${normalizedStatus === 'canceled' ? 'opacity-50' : ''}`} />
+        <p className="text-xs text-right text-slate-400">{normalizedStatus === 'canceled' ? `Canceled at ${data.progress || 0}%` : `${isProcessFinished ? 100 : data.progress || 0}% complete`}</p>
+        {normalizedStatus === 'canceled' && data.queue_position && <p className="text-xs text-center text-gray-400 pt-1">{data.queue_position}</p>}
 
-        {(data.status === 'queued' || data.status === 'processing') && data.processingId && (
-          <Button
-            onClick={handleCancelJobInSidebar}
-            disabled={isCanceling}
-            variant="destructive"
-            size="sm"
-            className="w-full mt-3"
-          >
-            {isCanceling ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <XCircle className="mr-2 h-4 w-4" />}
-            Cancel Processing
-          </Button>
-        )}
+          {showCancelButton && (
+            <Button
+              onClick={handleCancelJobInSidebar}
+              disabled={isCanceling}
+              variant="destructive"
+              size="sm"
+              className="w-full mt-3"
+            >
+              {isCanceling ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <XCircle className="mr-2 h-4 w-4" />}
+              Cancel Processing
+            </Button>
+          )}
       </div>
     ))
   );
@@ -324,8 +305,8 @@ export const ProcessSidebar: React.FC<ProcessSidebarProps> = ({ isOpen, onOpenCh
           value={jsonDataForViewer}
           displayObjectSize
           displayDataTypes
-          enableClipboard={false}
-          collapsed={data?.type === 'info' ? 1 : false} // Collapse 'info' type data by default
+          enableClipboard={true}
+          collapsed={data?.type === 'info' ? 1 : false}
           style={{...darkTheme, padding: '1rem', paddingTop: '2.5rem'}}
         />
       </div>

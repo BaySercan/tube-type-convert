@@ -9,14 +9,14 @@ import { Youtube, Music, Video, FileText, Info, Settings, Zap, HelpCircle, Chevr
 import { useIsMobile } from '@/hooks/use-mobile';
 
 const documentationSections = [
-  { id: 'introduction', title: '👋 Welcome!', icon: Zap },
-  { id: 'getting-started', title: '🚀 Getting Started', icon: Youtube },
-  { id: 'mp3-download', title: '🎵 MP3 Audio Download', icon: Music },
-  { id: 'mp4-download', title: '🎬 MP4 Video Download', icon: Video },
-  { id: 'ai-transcript', title: '📝 AI Transcript', icon: FileText },
-  { id: 'video-info', title: 'ℹ️ Video Info', icon: Info },
-  { id: 'process-sidebar', title: '📊 Understanding Results', icon: ChevronRight },
-  { id: 'tips-tricks', title: '💡 Tips & Tricks', icon: HelpCircle },
+  { id: 'introduction', title: '👋 Welcome!' },
+  { id: 'getting-started', title: '🚀 Getting Started' },
+  { id: 'mp3-download', title: '🎵 MP3 Audio Download' },
+  { id: 'mp4-download', title: '🎬 MP4 Video Download' },
+  { id: 'ai-transcript', title: '📝 AI Transcript' },
+  { id: 'video-info', title: 'ℹ️ Video Info' },
+  { id: 'process-sidebar', title: '📊 Understanding Results' },
+  { id: 'tips-tricks', title: '💡 Tips & Tricks' },
 ];
 
 const DocumentationPage: React.FC = () => {
@@ -26,6 +26,7 @@ const DocumentationPage: React.FC = () => {
   const isMobile = useIsMobile();
 
   useEffect(() => {
+    const refsSnapshot = { ...contentRefs.current };
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
@@ -41,13 +42,13 @@ const DocumentationPage: React.FC = () => {
     );
 
     documentationSections.forEach((section) => {
-      const element = contentRefs.current[section.id];
+      const element = refsSnapshot[section.id];
       if (element) observer.observe(element);
     });
 
     return () => {
       documentationSections.forEach((section) => {
-        const element = contentRefs.current[section.id];
+        const element = refsSnapshot[section.id];
         if (element) observer.unobserve(element);
       });
     };
@@ -73,14 +74,13 @@ const DocumentationPage: React.FC = () => {
                 <Button
                   variant="ghost"
                   onClick={() => scrollToSection(section.id)}
-                  className={`w-full justify-start items-center space-x-2 px-3 py-2 rounded-md transition-all duration-200
+                  className={`w-full justify-start px-3 py-2 rounded-md transition-all duration-200
                     ${activeSection === section.id
                       ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white shadow-md scale-105'
                       : 'hover:bg-gray-700/70 text-gray-300 hover:text-gray-100'
                     }`}
                 >
-                  <section.icon className={`w-5 h-5 ${activeSection === section.id ? 'text-white' : 'text-gray-400 group-hover:text-gray-200'}`} />
-                  <span>{section.title}</span>
+                  {section.title}
                 </Button>
               </li>
             ))}
@@ -124,9 +124,8 @@ const DocumentationPage: React.FC = () => {
               <Card className="bg-gray-800/30 backdrop-blur-md border-gray-700/40 shadow-xl overflow-hidden">
                 <CardHeader className="bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 p-8">
                   <div className="flex items-center space-x-4">
-                    <Zap className="w-12 h-12 text-white animate-pulse" />
                     <div>
-                      <CardTitle className="text-4xl font-bold text-white">Welcome to the YouTube Multi-Tool!</CardTitle>
+                      <CardTitle className="text-4xl font-bold text-white">👋 Welcome to the YouTube Multi-Tool!</CardTitle>
                       <CardDescription className="text-gray-200 text-lg mt-1">Your all-in-one solution for YouTube content.</CardDescription>
                     </div>
                   </div>
@@ -148,8 +147,7 @@ const DocumentationPage: React.FC = () => {
             <div id="getting-started" ref={(el) => (contentRefs.current['getting-started'] = el)} className="pt-8">
               <Card className="bg-gray-800/20 backdrop-blur-sm border-gray-700/30">
                 <CardHeader>
-                  <div className="flex items-center space-x-3">
-                    <Youtube className="w-8 h-8 text-red-500" />
+                  <div className="flex items-center">
                     <CardTitle className="text-2xl font-semibold text-gray-100">🚀 Getting Started: It's Simple!</CardTitle>
                   </div>
                 </CardHeader>
@@ -177,8 +175,7 @@ const DocumentationPage: React.FC = () => {
             <div id="mp3-download" ref={(el) => (contentRefs.current['mp3-download'] = el)} className="pt-8">
               <Card className="bg-gray-800/20 backdrop-blur-sm border-gray-700/30">
                 <CardHeader>
-                  <div className="flex items-center space-x-3">
-                    <Music className="w-8 h-8 text-green-400" />
+                  <div className="flex items-center">
                     <CardTitle className="text-2xl font-semibold text-gray-100">🎵 MP3 Audio Download</CardTitle>
                   </div>
                 </CardHeader>
@@ -204,8 +201,7 @@ const DocumentationPage: React.FC = () => {
             <div id="mp4-download" ref={(el) => (contentRefs.current['mp4-download'] = el)} className="pt-8">
               <Card className="bg-gray-800/20 backdrop-blur-sm border-gray-700/30">
                 <CardHeader>
-                  <div className="flex items-center space-x-3">
-                    <Video className="w-8 h-8 text-blue-400" />
+                  <div className="flex items-center">
                     <CardTitle className="text-2xl font-semibold text-gray-100">🎬 MP4 Video Download</CardTitle>
                   </div>
                 </CardHeader>
@@ -223,12 +219,11 @@ const DocumentationPage: React.FC = () => {
 
             <Separator className="my-12 bg-gray-700/50" />
 
-            {/* AI Transcript Section */}
+            {/* AI Transcript Section */} 
             <div id="ai-transcript" ref={(el) => (contentRefs.current['ai-transcript'] = el)} className="pt-8">
               <Card className="bg-gray-800/20 backdrop-blur-sm border-gray-700/30">
                 <CardHeader>
-                  <div className="flex items-center space-x-3">
-                    <FileText className="w-8 h-8 text-purple-400" />
+                  <div className="flex items-center">
                     <CardTitle className="text-2xl font-semibold text-gray-100">📝 AI Transcript</CardTitle>
                   </div>
                   <CardDescription className="text-gray-400">Unlock insights from video content with powerful AI-driven transcriptions.</CardDescription>
@@ -252,20 +247,35 @@ const DocumentationPage: React.FC = () => {
                     <div className="p-3 bg-gray-700/30 rounded-md border border-gray-600/40">
                       <p><strong>AI Model Selection:</strong> If "Skip AI Post-processing" is NOT checked, you can choose between different AI models for transcription:</p>
                       <ul className="list-disc list-inside pl-4 mt-2 space-y-1 text-gray-400">
-                        <li><strong>DeepSeek:</strong> Generally provides more stable and accurate results, but it may take a bit longer to process. Recommended for most use cases requiring high quality.</li>
-                        <li><strong>Qwen:</strong> Offers faster processing times. While good, it might be less predictable or consistent for certain types of audio or languages compared to DeepSeek.</li>
+                        <li><strong>DeepSeek:</strong> Premium model that provides highly accurate and consistent results. Recommended for:
+                          <ul className="list-disc list-inside pl-6 mt-1">
+                            <li>Professional transcriptions</li>
+                            <li>Complex content or technical discussions</li>
+                            <li>Multiple speakers or accented speech</li>
+                          </ul>
+                        </li>
+                        <li><strong>Qwen:</strong> Efficient model balancing speed and accuracy. Best for:
+                          <ul className="list-disc list-inside pl-6 mt-1">
+                            <li>Quick transcriptions of clear audio</li>
+                            <li>Single speaker content</li>
+                            <li>When faster processing is priority</li>
+                          </ul>
+                        </li>
                       </ul>
-                      <p className="mt-2">Select the model that best suits your needs for speed versus accuracy.</p>
+                      <p className="mt-2">Choose based on your specific needs for quality vs. processing time.</p>
                     </div>
                   </div>
 
-                  <p className="mt-4">
-                    After configuring, click "Start Process". Transcription, especially with AI processing, can take some time. You'll see progress updates in the Process Sidebar.
-                  </p>
-                  <p className="mt-2 p-3 bg-yellow-700/20 rounded-md border border-yellow-600/40 text-yellow-300">
-                    <Zap className="inline w-5 h-5 mr-2" />
-                    AI transcripts can provide summaries, key topics, and a searchable text version of the video, making content much more accessible!
-                  </p>
+                  <div className="space-y-3 mt-4">
+                    <p className="p-3 bg-gray-700/40 rounded-md border border-gray-600/40">
+                      <Info className="inline w-5 h-5 mr-2 text-blue-400" />
+                      The Process Sidebar will show real-time progress, elapsed time, and allow you to cancel the process if needed.
+                    </p>
+                    <p className="p-3 bg-yellow-700/20 rounded-md border border-yellow-600/40 text-yellow-300">
+                      <Zap className="inline w-5 h-5 mr-2" />
+                      AI transcripts include both raw transcription and processed summaries/notes, making content analysis quick and efficient!
+                    </p>
+                  </div>
                 </CardContent>
               </Card>
             </div>
@@ -276,8 +286,7 @@ const DocumentationPage: React.FC = () => {
             <div id="video-info" ref={(el) => (contentRefs.current['video-info'] = el)} className="pt-8">
               <Card className="bg-gray-800/20 backdrop-blur-sm border-gray-700/30">
                 <CardHeader>
-                  <div className="flex items-center space-x-3">
-                    <Info className="w-8 h-8 text-teal-400" />
+                  <div className="flex items-center">
                     <CardTitle className="text-2xl font-semibold text-gray-100">ℹ️ Video Info</CardTitle>
                   </div>
                 </CardHeader>
@@ -285,6 +294,12 @@ const DocumentationPage: React.FC = () => {
                   <p>Curious about a video's details? This option fetches publicly available metadata.</p>
                   <ul className="list-disc list-inside space-y-1 pl-4">
                     <li><strong>How it works:</strong> Select "Video Info" after providing the URL.</li>
+                    <li><strong>Information Types:</strong>
+                      <ul className="list-disc list-inside space-y-1 pl-6 mt-1">
+                        <li><strong>Summary:</strong> Quick overview with essential details</li>
+                        <li><strong>Full:</strong> Comprehensive metadata including all available information</li>
+                      </ul>
+                    </li>
                     <li><strong>Information Displayed:</strong> The Process Sidebar will show details like:
                         <ul className="list-disc list-inside space-y-1 pl-6 mt-1">
                             <li>Video Title</li>
@@ -292,10 +307,15 @@ const DocumentationPage: React.FC = () => {
                             <li>Video ID</li>
                             <li>Channel Name & ID</li>
                             <li>Upload Date</li>
+                            <li>And more, depending on the selected info type</li>
                         </ul>
                     </li>
-                    <li>This is a quick way to verify you have the right video or gather basic information for citation or records.</li>
+                    <li>This is a quick way to verify you have the right video or gather detailed information for analysis or records.</li>
                   </ul>
+                  <p className="mt-4 p-3 bg-gray-700/40 rounded-md border border-gray-600/50">
+                    <Info className="inline w-5 h-5 mr-2 text-blue-400" />
+                    Use the "Full" option when you need comprehensive metadata, or "Summary" for quick verification.
+                  </p>
                 </CardContent>
               </Card>
             </div>
@@ -306,8 +326,7 @@ const DocumentationPage: React.FC = () => {
             <div id="process-sidebar" ref={(el) => (contentRefs.current['process-sidebar'] = el)} className="pt-8">
               <Card className="bg-gray-800/20 backdrop-blur-sm border-gray-700/30">
                 <CardHeader>
-                  <div className="flex items-center space-x-3">
-                    <ChevronRight className="w-8 h-8 text-orange-400" />
+                  <div className="flex items-center">
                     <CardTitle className="text-2xl font-semibold text-gray-100">📊 Understanding Results: The Process Sidebar</CardTitle>
                   </div>
                 </CardHeader>
@@ -317,20 +336,40 @@ const DocumentationPage: React.FC = () => {
                   </p>
                   <ul className="list-disc list-inside space-y-2 pl-4">
                     <li><strong>Loading States:</strong> Indicates when the tool is fetching data, processing your request, or waiting for the backend.</li>
-                    <li><strong>Progress Updates:</strong> For longer tasks like AI transcription, you'll often see a progress percentage or status messages (e.g., "Processing initiated", "Fetching result").</li>
+                    <li><strong>Process Control:</strong>
+                      <ul className="list-disc list-inside space-y-1 pl-6 mt-1">
+                        <li><strong>Cancel Button:</strong> Available during active processes to stop the operation if needed.</li>
+                        <li><strong>Elapsed Timer:</strong> For transcript requests, shows the time elapsed since the process started.</li>
+                      </ul>
+                    </li>
+                    <li><strong>Progress Updates:</strong> 
+                      <ul className="list-disc list-inside space-y-1 pl-6 mt-1">
+                        <li>Visual progress bar showing completion percentage</li>
+                        <li>Status messages (e.g., "Processing", "Completed", "Failed", "Canceled")</li>
+                        <li>Queue position information when applicable</li>
+                      </ul>
+                    </li>
                     <li><strong>Results Display:</strong>
                         <ul className="list-disc list-inside space-y-1 pl-6 mt-1">
-                            <li><strong>Downloads (MP3/MP4):</strong> May show a media player to preview or confirm the file, along with the filename. Downloads usually start automatically.</li>
-                            <li><strong>AI Transcripts:</strong> Displays the transcript text, AI notes, language, and other relevant processing details.</li>
-                            <li><strong>Video Info:</strong> Lists the fetched metadata.</li>
+                            <li><strong>Downloads (MP3/MP4):</strong> Includes media preview player and automatic download functionality.</li>
+                            <li><strong>AI Transcripts:</strong> Shows transcript text, AI analysis, language settings, and processing details.</li>
+                            <li><strong>Video Info:</strong> Displays metadata in a collapsible JSON viewer for easy navigation.</li>
                         </ul>
                     </li>
-                    <li><strong>Error Messages:</strong> If something goes wrong (e.g., invalid URL, API error, processing failure), the sidebar will display an error message to help you understand the issue.</li>
-                    <li><strong>Reopen Button:</strong> If you close the sidebar, a button (often with <ChevronsLeft className="inline w-4 h-4" /> icon) will typically appear, allowing you to reopen it and view the last process details.</li>
+                    <li><strong>Error Messages:</strong> Clear error feedback with suggestions for resolution when issues occur.</li>
+                    <li><strong>Navigation Links:</strong> Quick access to progress and result pages for sharing or future reference.</li>
+                    <li><strong>Reopen Button:</strong> A <ChevronsLeft className="inline w-4 h-4" /> button appears when the sidebar is closed, letting you review the latest process.</li>
                   </ul>
-                  <p className="mt-4 p-3 bg-gray-700/40 rounded-md border border-gray-600/50">
-                    Keep an eye on the sidebar for all feedback regarding your requests! It's designed to be informative and keep you updated every step of the way.
-                  </p>
+                  <div className="space-y-3">
+                    <p className="p-3 bg-gray-700/40 rounded-md border border-gray-600/50">
+                      <Info className="inline w-5 h-5 mr-2 text-blue-400" />
+                      The Process Sidebar maintains its state even when closed, ensuring you don't lose track of ongoing processes.
+                    </p>
+                    <p className="p-3 bg-yellow-700/20 rounded-md border border-yellow-600/40 text-yellow-300">
+                      <Zap className="inline w-5 h-5 mr-2" />
+                      Remember to save or copy important results before refreshing, as process data is temporary!
+                    </p>
+                  </div>
                 </CardContent>
               </Card>
             </div>
@@ -341,8 +380,7 @@ const DocumentationPage: React.FC = () => {
             <div id="tips-tricks" ref={(el) => (contentRefs.current['tips-tricks'] = el)} className="pt-8">
               <Card className="bg-gray-800/20 backdrop-blur-sm border-gray-700/30">
                 <CardHeader>
-                  <div className="flex items-center space-x-3">
-                    <HelpCircle className="w-8 h-8 text-yellow-400" />
+                  <div className="flex items-center">
                     <CardTitle className="text-2xl font-semibold text-gray-100">💡 Tips & Tricks</CardTitle>
                   </div>
                 </CardHeader>
