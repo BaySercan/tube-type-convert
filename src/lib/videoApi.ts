@@ -89,6 +89,7 @@ export const getVideoInfo = async (videoUrl: string, infoType: 'sum' | 'full' = 
   const response = await authenticatedFetch(`${API_BASE_URL}/info?${params.toString()}`);
   if (!response.ok) {
     const errorData: ErrorResponse = await response.json().catch(() => ({ message: response.statusText }));
+    console.error('[videoApi] getVideoInfo request failed:', errorData);
     throw new Error(errorData.message || `API request failed with status ${response.status}`);
   }
   return response.json();
