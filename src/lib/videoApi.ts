@@ -12,6 +12,7 @@ export interface VideoInfo { // Added export
   channel_id: string;
   channel_name: string;
   post_date: string;
+  duration_string?: string;
   [key: string]: unknown;
 }
 

@@ -10,7 +10,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Copy, ExternalLink, InfoIcon, AlertTriangleIcon, Download, Loader2, Youtube, FileText, Clock, BrainCircuit, XCircle } from "lucide-react";
+import { Copy, ExternalLink, InfoIcon, AlertTriangleIcon, Download, Loader2, Youtube, FileText, Clock, BrainCircuit, XCircle, RefreshCw } from "lucide-react";
 import JsonView from '@uiw/react-json-view';
 import { darkTheme } from '@uiw/react-json-view/dark';
 import { useCancelJob } from "@/hooks/useCancelJob";
@@ -21,6 +21,8 @@ import { Link } from "react-router-dom";
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { getLanguageName } from "@/lib/utils";
 import { JobStatus, JobType as VideoApiJobType } from "@/lib/videoApi";
+import { ProcessedVideo } from "@/lib/db/types";
+import { formatCacheAge, isCacheStale } from "@/lib/db/cacheUtils";
 
 export type SidebarJobType = VideoApiJobType | 'info';
 
@@ -42,6 +44,8 @@ export interface SidebarData {
   mediaType?: 'audio/mpeg' | 'video/mp4' | string;
   type?: SidebarJobType;
   queue_position?: string;
+  cachedVideoData?: ProcessedVideo | null;
+  lastRequested?: string;
   [key: string]: unknown;
 }
 
@@ -51,8 +55,12 @@ interface ProcessSidebarProps {
   title: string;
   data: SidebarData | null;
   isLoading?: boolean;
+  isRefreshing?: boolean;
   error?: string | null;
   onJobCanceled?: (processingId: string) => void;
+  onRefreshInfo?: () => void;
+  onRefreshTranscript?: () => void;
+  onRefreshData?: () => void;
 }
 
 const YouTubeEmbed = ({ url }: { url: string }) => {
@@ -74,7 +82,7 @@ const YouTubeEmbed = ({ url }: { url: string }) => {
   );
 };
 
-export const ProcessSidebar: React.FC<ProcessSidebarProps> = ({ isOpen, onOpenChange, title, data, isLoading = false, error = null, onJobCanceled }) => {
+export const ProcessSidebar: React.FC<ProcessSidebarProps> = ({ isOpen, onOpenChange, title, data, isLoading = false, isRefreshing = false, error = null, onJobCanceled, onRefreshData }) => {
   const funnyWaitingMessages = useMemo(() => ["Reticulating splines...", "Generating witty dialog...", "Spinning up the hamster..."], []);
   const [currentLoadingMessage, setCurrentLoadingMessage] = useState(funnyWaitingMessages[0]);
   const { toast } = useToast();
@@ -297,7 +305,105 @@ export const ProcessSidebar: React.FC<ProcessSidebarProps> = ({ isOpen, onOpenCh
     ))
   );
 
-  const jsonResultCard = hasJsonDataForViewer && (
+  // Cached data card for info requests - only show refresh button if this is actually cached data (not first time)
+  const cachedInfoCard = data?.cachedVideoData?.info_result && data.type === 'info' && (
+    renderCard("Cached Video Information", InfoIcon, (
+      <div className="space-y-3">
+        {data.lastRequested && (
+          <div className="text-sm text-slate-300">
+            <p><strong>Last requested:</strong> {new Date(data.lastRequested).toLocaleString()}</p>
+            <p className="text-xs text-slate-400 mt-1">
+              Cache age: {formatCacheAge(data.cachedVideoData?.updated_at)}{isCacheStale(data.cachedVideoData?.updated_at) ? ' (stale)' : ' (fresh)'}
+            </p>
+            <p className="text-xs text-slate-400 mt-1">
+              If this data seems outdated, you can refresh it below.
+            </p>
+          </div>
+        )}
+        {/* Only show refresh button if this is actually cached data (has an ID) */}
+        {data.cachedVideoData?.id && onRefreshData && (
+          <div className="flex gap-2">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => onRefreshData && onRefreshData()}
+              disabled={isRefreshing}
+              className="border-slate-600 hover:bg-slate-700 text-slate-800 hover:text-slate-900"
+            >
+              {isRefreshing ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <RefreshCw className="h-4 w-4 mr-2" />
+              )}
+              {isRefreshing ? 'Refreshing...' : 'Refresh Info'}
+            </Button>
+          </div>
+        )}
+        <div className="relative rounded-md bg-slate-900/70 border border-slate-700 w-full overflow-hidden mt-2">
+          <Button variant="ghost" size="icon" onClick={handleCopyJson} className="absolute top-2 right-2 text-slate-400 hover:text-white z-10" title="Copy JSON"><Copy className="h-4 w-4" /></Button>
+          <JsonView
+            value={data.cachedVideoData.info_result}
+            displayObjectSize
+            displayDataTypes
+            enableClipboard={true}
+            collapsed={1}
+            style={{...darkTheme, padding: '1rem', paddingTop: '2.5rem'}}
+          />
+        </div>
+      </div>
+    ))
+  );
+
+  // Cached data card for transcript requests - only show refresh button if this is actually cached data (not first time)
+  const cachedTranscriptCard = data?.cachedVideoData?.transcript_result && data.type === 'transcript' && (
+    renderCard("Cached Transcript", FileText, (
+      <div className="space-y-3">
+        {data.lastRequested && (
+          <div className="text-sm text-slate-300">
+            <p><strong>Last requested:</strong> {new Date(data.lastRequested).toLocaleString()}</p>
+            <p className="text-xs text-slate-400 mt-1">
+              Cache age: {formatCacheAge(data.cachedVideoData?.updated_at)}{isCacheStale(data.cachedVideoData?.updated_at) ? ' (stale)' : ' (fresh)'}
+            </p>
+            <p className="text-xs text-slate-400 mt-1">
+              If this transcript seems outdated, you can refresh it below.
+            </p>
+          </div>
+        )}
+        {/* Only show refresh button if this is actually cached data (has an ID) */}
+        {data.cachedVideoData?.id && onRefreshData && (
+          <div className="flex gap-2">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => onRefreshData && onRefreshData()}
+              disabled={isRefreshing}
+              className="border-slate-600 hover:bg-slate-700 text-slate-800 hover:text-slate-900"
+            >
+              {isRefreshing ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <RefreshCw className="h-4 w-4 mr-2" />
+              )}
+              {isRefreshing ? 'Refreshing...' : 'Refresh Transcript'}
+            </Button>
+          </div>
+        )}
+        <div className="relative rounded-md bg-slate-900/70 border border-slate-700 w-full overflow-hidden mt-2">
+          <Button variant="ghost" size="icon" onClick={handleCopyJson} className="absolute top-2 right-2 text-slate-400 hover:text-white z-10" title="Copy JSON"><Copy className="h-4 w-4" /></Button>
+          <JsonView
+            value={data.cachedVideoData.transcript_result}
+            displayObjectSize
+            displayDataTypes
+            enableClipboard={true}
+            collapsed={1}
+            style={{...darkTheme, padding: '1rem', paddingTop: '2.5rem'}}
+          />
+        </div>
+      </div>
+    ))
+  );
+
+  const jsonResultCard = hasJsonDataForViewer && !data?.cachedVideoData && (
     renderCard("Result JSON", BrainCircuit, (
       <div className="relative rounded-md bg-slate-900/70 border border-slate-700 w-full overflow-hidden">
         <Button variant="ghost" size="icon" onClick={handleCopyJson} className="absolute top-2 right-2 text-slate-400 hover:text-white z-10" title="Copy JSON"><Copy className="h-4 w-4" /></Button>
@@ -373,6 +479,8 @@ export const ProcessSidebar: React.FC<ProcessSidebarProps> = ({ isOpen, onOpenCh
                   )}
                 </div>
               ))}
+              {cachedInfoCard}
+              {cachedTranscriptCard}
               {jsonResultCard}
             </div>
           </div>

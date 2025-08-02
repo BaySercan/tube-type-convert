@@ -26,6 +26,9 @@ import * as videoApi from '@/lib/videoApi';
 import { StillProcessingError } from '@/lib/videoApi';
 import type { AsyncJobResponse, TranscriptResponse, ProgressResponse } from '@/lib/videoApi';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useVideoCache } from '@/hooks/useVideoCache';
+import { ProcessedVideosService, UserVideoRequestsService } from '@/lib/db';
+import { extractVideoId } from '@/lib/db/utils';
 
 
 const Index = () => {
@@ -49,6 +52,9 @@ const Index = () => {
   const [jobIdForResults, setJobIdForResults] = useState<string | null>(null);
 
   const queryClient = useQueryClient();
+
+  // Use cache hook for current URL and selected output
+  const { videoData: cachedVideoData, userHasRequested, isLoading: isCacheLoading, isRefreshing, error: cacheError, trackUserRequest, updateVideoWithRequest } = useVideoCache(url, selectedOutput as 'info' | 'transcript' | 'mp3' | 'mp4');
 
   const transcriptLanguages = [
     { value: 'tr', label: 'Turkish' },
@@ -118,9 +124,24 @@ const Index = () => {
   // For Video Info
   type InfoMutationArgs = { videoUrl: string; infoType: 'sum' | 'full' };
   const infoMutation = useMutation<videoApi.VideoInfo, Error, InfoMutationArgs>({
-    mutationFn: (args) => videoApi.getVideoInfo(args.videoUrl, args.infoType),
-    onSuccess: (data, variables) => { // 'data' here is the full VideoInfo object
+    mutationFn: async (args) => {
+      return videoApi.getVideoInfo(args.videoUrl, args.infoType);
+    },
+    onSuccess: async (data, variables) => { // 'data' here is the full VideoInfo object
       setSidebarTitle(`Video Information (${variables.infoType === 'sum' ? 'Summary' : 'Full Details'})`);
+      
+      // Update database with new info result and metadata
+      await updateVideoWithRequest({
+        video_id: extractVideoId(variables.videoUrl),
+        info_result: data as unknown as Record<string, unknown>,
+        title: data.title,
+        channel_id: data.channel_id,
+        video_url: variables.videoUrl,
+        language: 'en', // Default language for info
+        thumbnail_url: data.thumbnail,
+        duration: data.duration_string // Use duration_string as string
+      });
+
       const displayData: ProcessSidebarData = {
         ...data, // Spread the API response
         originalUrl: variables.videoUrl,
@@ -146,8 +167,10 @@ const Index = () => {
   type DownloadArgs = { url: string; format: 'mp3' | 'mp4' };
 
   const downloadFileMutation = useMutation<Blob, Error, DownloadArgs>({
-    mutationFn: (args) => (args.format === 'mp3' ? videoApi.downloadMp3(args.url) : videoApi.downloadMp4(args.url)),
-    onSuccess: (blob, variables) => {
+    mutationFn: async (args) => {
+      return args.format === 'mp3' ? videoApi.downloadMp3(args.url) : videoApi.downloadMp4(args.url);
+    },
+    onSuccess: async (blob, variables) => {
       const link = document.createElement('a');
       link.href = URL.createObjectURL(blob);
       const videoIdMatch = variables.url.match(/[?&]v=([^&]+)/);
@@ -162,6 +185,13 @@ const Index = () => {
       }
       setActiveBlobUrl(link.href);
 
+      // Update database with download request
+      await updateVideoWithRequest({
+        video_id: extractVideoId(variables.url),
+        title: fileName,
+        video_url: variables.url
+      });
+
       setSidebarTitle(`${variables.format.toUpperCase()} Ready`);
       setSidebarData({
         message: `${variables.format.toUpperCase()} is ready. Download has started. You can also play it here.`,
@@ -172,7 +202,7 @@ const Index = () => {
       });
       setErrorForSidebar(null);
     },
-    onError: (error, variables) => {
+    onError: async (error, variables) => {
       if (activeBlobUrl) {
         URL.revokeObjectURL(activeBlobUrl);
         setActiveBlobUrl(null);
@@ -196,10 +226,15 @@ const Index = () => {
   };
 
   const transcriptMutation = useMutation<TranscriptResponse | AsyncJobResponse, Error, TranscriptMutationArgs>({
-    mutationFn: (args) => videoApi.getVideoTranscript(args.videoUrl, args.lang, args.skipAI, args.useDeepSeek),
-    onSuccess: (data, variables) => {
+    mutationFn: async (args) => {
+      return videoApi.getVideoTranscript(args.videoUrl, args.lang, args.skipAI, args.useDeepSeek);
+    },
+    onSuccess: async (data, variables) => {
       setErrorForSidebar(null);
       setCurrentProcessingId(null);
+
+      // Track user request for both async and direct responses
+      await trackUserRequest();
 
       const baseSidebarData = {
         originalUrl: variables.videoUrl,
@@ -220,9 +255,41 @@ const Index = () => {
       } else {
         setSidebarTitle("Video Transcript");
         setSidebarData({ ...baseSidebarData, ...data, status: "final_result_displayed", progress: 100 });
+        
+        // Get video info first to extract thumbnail and duration
+        try {
+          const videoInfo = await videoApi.getVideoInfo(variables.videoUrl, 'sum');
+          
+          // Update database with transcript result and metadata
+          await updateVideoWithRequest({
+            video_id: extractVideoId(variables.videoUrl),
+            transcript_result: data as unknown as Record<string, unknown>,
+            title: data.title,
+            channel_id: data.channel_id,
+            video_url: variables.videoUrl,
+            language: variables.lang,
+            thumbnail_url: videoInfo.thumbnail,
+            duration: videoInfo.duration_string // Use duration_string as string
+          });
+
+          console.log('✅ Transcript result saved to database successfully');
+        } catch (infoError) {
+          console.error('Error fetching video info for metadata:', infoError);
+          // Still update with transcript result even if info fetch fails
+          await updateVideoWithRequest({
+            video_id: extractVideoId(variables.videoUrl),
+            transcript_result: data as unknown as Record<string, unknown>,
+            title: data.title,
+            channel_id: data.channel_id,
+            video_url: variables.videoUrl,
+            language: variables.lang
+          });
+
+          console.log('✅ Transcript result saved to database (without metadata)');
+        }
       }
     },
-    onError: (error, variables) => {
+    onError: async (error, variables) => {
       setCurrentProcessingId(null);
       setSidebarTitle("Error Fetching Transcript");
       setErrorForSidebar(error.message || "An unknown error occurred.");
@@ -315,8 +382,53 @@ const Index = () => {
       setErrorForSidebar(null);
       setJobIdForResults(null);
       queryClient.invalidateQueries({ queryKey: ['result', jobIdForResults] });
+
+      // Save transcript result to database for async job completion
+      const saveTranscriptToDatabase = async () => {
+        try {
+          const videoId = extractVideoId(sidebarData?.originalUrl || '');
+          if (!videoId) return;
+
+          // Get video info first to extract thumbnail and duration
+          try {
+            const videoInfo = await videoApi.getVideoInfo(sidebarData?.originalUrl || '', 'sum');
+            
+            // Update database with transcript result and metadata
+            await updateVideoWithRequest({
+              video_id: videoId,
+              transcript_result: resultData as unknown as Record<string, unknown>,
+              title: resultData.title,
+              channel_id: resultData.channel_id,
+              video_url: sidebarData?.originalUrl,
+              language: sidebarData?.requestedLang || 'en',
+              thumbnail_url: videoInfo.thumbnail,
+              duration: videoInfo.duration_string // Use duration_string as string
+            });
+
+            console.log('✅ Transcript result saved to database successfully');
+          } catch (infoError) {
+            console.error('Error fetching video info for metadata:', infoError);
+            // Still update with transcript result even if info fetch fails
+            await updateVideoWithRequest({
+              video_id: videoId,
+              transcript_result: resultData as unknown as Record<string, unknown>,
+              title: resultData.title,
+              channel_id: resultData.channel_id,
+              video_url: sidebarData?.originalUrl,
+              language: sidebarData?.requestedLang || 'en'
+            });
+
+            console.log('✅ Transcript result saved to database (without metadata)');
+          }
+        } catch (error) {
+          console.error('Error saving transcript result to database:', error);
+        }
+      };
+
+      // Save transcript result to database
+      saveTranscriptToDatabase();
     }
-  }, [resultData, jobIdForResults, queryClient]);
+  }, [resultData, jobIdForResults, queryClient, sidebarData, updateVideoWithRequest]);
 
   useEffect(() => {
     if (resultError) {
@@ -327,6 +439,40 @@ const Index = () => {
 
   const isProcessing = infoMutation.isPending || downloadFileMutation.isPending || transcriptMutation.isPending || !!currentProcessingId || !!jobIdForResults;
   const isSidebarLoading = isProcessing;
+
+  const handleRefreshData = async () => {
+    // Preserve the originalUrl and other important data, just show loading state
+    setSidebarData(prevData => ({
+      ...prevData,
+      status: 'initiated',
+      progress: 0,
+      type: selectedOutput as ProcessSidebarData['type']
+    }));
+    setErrorForSidebar(null);
+    
+    // Track user request for refresh
+    await trackUserRequest();
+
+    // Make fresh API call
+    openSidebarForAction(`Refreshing ${selectedOutput.toUpperCase()}...`);
+
+    switch (selectedOutput) {
+      case 'info':
+        infoMutation.mutate({ videoUrl: url, infoType: infoType });
+        break;
+      case 'mp3':
+        downloadFileMutation.mutate({ url, format: 'mp3' });
+        break;
+      case 'mp4':
+        downloadFileMutation.mutate({ url, format: 'mp4' });
+        break;
+      case 'transcript':
+        transcriptMutation.mutate({ videoUrl: url, lang: transcriptLang, skipAI: transcriptSkipAI, useDeepSeek: aiModel === 'deepseek' });
+        break;
+      default:
+        toast({ title: "Error", description: "Invalid output type selected.", variant: "destructive" });
+    }
+  };
 
   const handleProcess = () => {
     setCurrentProcessingId(null);
@@ -339,6 +485,11 @@ const Index = () => {
       setActiveBlobUrl(null);
     }
 
+    // Clear cache errors when starting new processing
+    if (cacheError) {
+      // The cache error will be cleared by the useEffect in useVideoCache
+    }
+
     if (!url.trim() || !isValidYouTubeUrl(url)) {
       toast({ title: "Invalid URL", description: "Please enter a valid YouTube URL", variant: "destructive" });
       return;
@@ -348,6 +499,51 @@ const Index = () => {
       return;
     }
 
+    // Check if we have cached data for info requests
+    if (selectedOutput === 'info' && cachedVideoData?.info_result) {
+      // Show cached data first
+      setSidebarTitle(`Cached Video Information`);
+      setSidebarData({
+        originalUrl: url,
+        type: 'info',
+        status: 'completed',
+        progress: 100,
+        cachedVideoData: cachedVideoData,
+        lastRequested: cachedVideoData.updated_at || cachedVideoData.created_at
+      });
+      setErrorForSidebar(null);
+      setIsSidebarOpen(true);
+      return; // Don't make API call, show cached data
+    }
+
+    // Check if we have cached data for transcript requests
+    if (selectedOutput === 'transcript' && cachedVideoData?.transcript_result) {
+      // Track user request and update database even for cached data
+      const handleCachedTranscript = async () => {
+        await trackUserRequest();
+        await updateVideoWithRequest({
+          video_id: extractVideoId(url),
+          video_url: url
+        });
+      };
+      handleCachedTranscript();
+
+      // Show cached data first
+      setSidebarTitle(`Cached Transcript`);
+      setSidebarData({
+        originalUrl: url,
+        type: 'transcript',
+        status: 'completed',
+        progress: 100,
+        cachedVideoData: cachedVideoData,
+        lastRequested: cachedVideoData.updated_at || cachedVideoData.created_at
+      });
+      setErrorForSidebar(null);
+      setIsSidebarOpen(true);
+      return; // Don't make API call, show cached data
+    }
+
+    // No cached data or user wants fresh data, proceed with API call
     const initialData: ProcessSidebarData = {
       originalUrl: url,
       status: 'initiated',
@@ -355,6 +551,12 @@ const Index = () => {
       type: selectedOutput as ProcessSidebarData['type'] // Align with SidebarData['type'] more directly
     };
     openSidebarForAction(`Preparing ${selectedOutput.toUpperCase()}...`, initialData);
+
+    // Clear any existing sidebar errors when starting new process
+    setErrorForSidebar(null);
+
+    // Track user request before making API call
+    trackUserRequest();
 
     switch (selectedOutput) {
       case 'info':
@@ -500,10 +702,16 @@ const Index = () => {
         isOpen={isSidebarOpen} 
         onOpenChange={handleSidebarOpenChange} 
         title={sidebarTitle} 
-        data={sidebarData} 
-        isLoading={isSidebarLoading} 
-        error={sidebarError}
+        data={{
+          ...sidebarData,
+          cachedVideoData,
+          lastRequested: cachedVideoData?.updated_at || cachedVideoData?.created_at
+        }} 
+        isLoading={isSidebarLoading || isCacheLoading} 
+        isRefreshing={isRefreshing}
+        error={sidebarError || cacheError}
         onJobCanceled={handleJobCanceled}
+        onRefreshData={handleRefreshData}
       />
 
       {showReopenButton && <Button onClick={() => setIsSidebarOpen(true)} className="fixed top-1/2 right-0 -translate-y-1/2 z-50 bg-slate-600 hover:bg-slate-500 text-white p-4 rounded-l-lg shadow-xl animate-pulse border-2 border-slate-400 h-32" title="Reopen Sidebar"><ChevronsLeft className="h-10 w-10" /></Button>}
